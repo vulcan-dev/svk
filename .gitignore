@@ -1,0 +1,9 @@
+*.10x
+*.rdbg
+build/*
+rom/shaders/compiled
+deps/sdl2/*
+*.jpg
+
+!deps/sdl2/.gitkeep
+!build/.gitkeep
