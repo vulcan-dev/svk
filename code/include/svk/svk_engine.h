@@ -55,12 +55,17 @@ struct _svkEngineSwapChain
     VkExtent2D extent;
 };
 
+struct _svkEngineScene
+{
+    SVKVECTOR_TYPE(svkDrawable) drawables;
+};
+
 struct _svkEngineRenderer
 {
     SVKARRAY_TYPE(VkSemaphore) imageAvailableSemaphores;
     SVKARRAY_TYPE(VkSemaphore) renderFinishedSemaphores;
     SVKARRAY_TYPE(VkFence) inFlightFences;
-    // TODO: Clear color
+    VkClearValue clearColor;
 };
 
 struct _svkEngineCore
@@ -80,6 +85,13 @@ struct _svkEngineCore
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
     VkCommandPool commandPool;
+
+    VkBuffer vertexBuffer;
+    VkBuffer indexBuffer;
+
+    VkDeviceMemory vertexBufferMemory;
+    VkDeviceMemory indexBufferMemory;
+
     SVKARRAY_TYPE(VkCommandBuffer) commandBuffers;
 };
 
@@ -100,10 +112,17 @@ typedef struct svkSwapChainSupportDetails {
     SVKVECTOR_TYPE(VkPresentModeKHR) presentModes;
 } svkSwapChainSupportDetails;
 
+typedef struct svkDrawable
+{
+    SVKVECTOR_TYPE(svkVertex) vertices;
+    SVKVECTOR_TYPE(uint16_t) indices;
+} svkDrawable;
+
 typedef struct svkEngine
 {
     struct _svkEngineCore core;
     struct _svkEngineInfo info;
+    struct _svkEngineScene* scene;
     struct _svkEngineSwapChain* swapChain;
 
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -124,13 +143,19 @@ VkResult svkEngine_RecreateSwapChain(
     const VkSurfaceKHR surface,
     SDL_Window* window);
 
+svkDrawable* svkDrawable_Create(
+    const svkVertex* vertices,
+    const uint16_t vertexCount,
+    const uint16_t* indices,
+    const uint16_t indexCount);
+
 // Internal Functions
 //------------------------------------------------------------------------
 svkQueueFamilyIndices _svkEngine_FindQueueFamilies(
     const VkPhysicalDevice physicalDevice,
     const VkSurfaceKHR surface);
 
-bool _svkEngine_Initialize(
+VkResult _svkEngine_Initialize(
     svkEngine*  svke,
     SDL_Window* window);
 

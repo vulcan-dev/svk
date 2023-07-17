@@ -8,7 +8,10 @@ VkResult _svkEngine_DrawFrame(
     const VkPhysicalDevice physicalDevice,
     const VkSurfaceKHR surface,
     const VkDevice device,
+    const VkBuffer vertexBuffer,
+    const VkBuffer indexBuffer,
     const SVKARRAY_TYPE(VkCommandBuffer) commandBuffers,
+    const SVKVECTOR_TYPE(svkDrawable) drawables,
     const VkPipeline graphicsPipeline,
     const VkRenderPass renderPass,
     struct _svkEngineSwapChain* swapChain,
@@ -28,7 +31,7 @@ VkResult _svkEngine_DrawFrame(
     vkResetFences(device, 1, &renderer->inFlightFences[currentFrame]);
 
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    _svkEngine_RecordCommandBuffer(commandBuffers[currentFrame], imageIndex, renderPass, swapChain->frameBuffers, swapChain->extent, graphicsPipeline);
+    _svkEngine_RecordCommandBuffer(commandBuffers[currentFrame], vertexBuffer, indexBuffer, imageIndex, renderPass, renderer->clearColor, swapChain->frameBuffers, drawables, swapChain->extent, graphicsPipeline);
 
     VkSemaphore signalSemaphores[] = { renderer->renderFinishedSemaphores[currentFrame] };
     {

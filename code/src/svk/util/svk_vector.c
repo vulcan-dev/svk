@@ -5,56 +5,22 @@
 #include <string.h>
 #include <assert.h>
 
-svkVector*
-svkVector_Create(u32 initialCapacity, size_t size)
+svkVector* svkVector_Create(u32 initialCapacity, size_t size)
 {
     svkVector* svkVec = SVK_ZMSTRUCT(svkVector, 1);
-    svkVec->data = SVK_MALLOC(size * initialCapacity);
+    svkVec->data = calloc(initialCapacity, size);
     svkVec->size = 0;
     svkVec->cap = initialCapacity;
-    
-    if (initialCapacity == 0)
-        return svkVec;
-
-    for (u32 i = 0; i < initialCapacity; i++)
-        SVK_ZM(svkVec->data[i], size);
+    svkVec->typeSize = size;
 
     return svkVec;
 }
 
 void
-svkVector_Init(svkVector* svkVec, u32 initialCapacity)
+svkVector_Resize(svkVector* svkVec, size_t newSize)
 {
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
-    svkVec->data = SVK_ZMSTRUCT(void*, initialCapacity);
-    svkVec->size = 0;
-    svkVec->cap = initialCapacity;
-}
-
-void
-svkVector_Free(svkVector* svkVec)
-{
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
-    SVK_FREE(svkVec->data);
-    SVK_FREE(svkVec);
-}
-
-void svkVector_FreeWithData(svkVector* svkVec)
-{
-    for (u32 i = 0; i < svkVec->size; i++)
-    {
-        SVK_FREE(svkVec->data[i]);
-        svkVec->data[i] = NULL;
-    }
-    SVK_FREE(svkVec->data);
-    SVK_FREE(svkVec);
-}
-
-void
-svkVector_Resize(svkVector* svkVec, u32 newSize)
-{
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
-    void** newData = (void*)realloc(svkVec->data, sizeof(void*) * newSize);
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
+    void* newData = (void*)realloc(svkVec->data, svkVec->typeSize * newSize);
     if (newData == NULL)
     {
         fprintf(stderr, "Failed to resize vector\n");
@@ -63,12 +29,54 @@ svkVector_Resize(svkVector* svkVec, u32 newSize)
 
     svkVec->data = newData;
     svkVec->cap = newSize;
+
+    if (newSize < svkVec->size)
+        svkVec->size = newSize;
+}
+
+void
+svkVector_Init(svkVector* svkVec, u32 initialCapacity)
+{
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
+    svkVec->data = SVK_ZMSTRUCT(void*, initialCapacity);
+    svkVec->size = 0;
+    svkVec->cap = initialCapacity;
+}
+
+void
+svkVector_Free(svkVector* svkVec)
+{
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
+    SVK_FREE(svkVec->data);
+    SVK_FREE(svkVec);
+}
+
+void
+svkVector_PushBack(svkVector* svkVec, void* pValue)
+{
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
+    if (svkVec->size >= svkVec->cap)
+    {
+        svkVector_Resize(svkVec, svkVec->cap * 2);
+        return;
+    }
+
+    svkVec->data[svkVec->size] = pValue;
+    svkVec->size++;
+}
+
+void svkVector_FreeWithData(svkVector* svkVec)
+{
+    for (u32 i = 0; i < svkVec->size; i++)
+        SVK_FREE(svkVec->data[i]);
+    SVK_FREE(svkVec->data);
+    SVK_FREE(svkVec);
 }
 
 void
 svkVector_UpdateSize(svkVector* svkVec)
 {
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
     u32 newSize = 0;
     for (u32 i = 0; i < svkVec->cap; i++)
     {
@@ -78,17 +86,6 @@ svkVector_UpdateSize(svkVector* svkVec)
             break;
     }
     svkVec->size = newSize;
-}
-
-void
-svkVector_PushBack(svkVector* svkVec, void* pValue)
-{
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
-    if (svkVec->size >= svkVec->cap)
-        svkVector_Resize(svkVec, svkVec->cap * 2);
-
-    svkVec->data[svkVec->size] = pValue;
-    svkVec->size++;
 }
 
 void
@@ -102,7 +99,7 @@ svkVector_PushBackCopy(svkVector* svkVec, void* pValue, size_t size)
 void
 svkVector_PushBackString(svkVector* svkVec, void* pValue)
 {
-    SVK_ASSERT(svkVec == NULL, "svkVector is NULL!");
+    SVK_ASSERT(svkVec, "svkVector is NULL!");
     if (svkVec->size >= svkVec->cap)
         svkVector_Resize(svkVec, svkVec->cap * 2);
 
@@ -115,17 +112,14 @@ svkVector_PushBackString(svkVector* svkVec, void* pValue)
     svkVec->size++;
 }
 
-
 void
 svkVector_Erase(svkVector* svkVec, void* value)
 {
     bool isStringValue = false;
     char* stringValue = NULL;
 
-    // Check if the value is a string
     if (value != NULL)
     {
-        // Cast the value to a char* pointer
         stringValue = (char*)value;
         isStringValue = true;
     }

@@ -8,13 +8,15 @@ typedef struct svkVector
     void** data;
     u32 cap;
     u32 size;
+    size_t typeSize;
 } svkVector;
 
 svkVector* svkVector_Create(u32 initialCapacity, size_t size);
 void svkVector_Init(svkVector* svkVec, u32 initialCapacity);
 void svkVector_Free(svkVector* svkVec);
 void svkVector_FreeWithData(svkVector* svkVec);
-void svkVector_Resize(svkVector* svkVec, u32 newSize);
+void svkVector_Resize(svkVector* svkVec, size_t newSize);
+//void svkVector_Resize(svkVector* svkVec, u32 newSize);
 void svkVector_UpdateSize(svkVector* svkVec);
 void svkVector_PushBack(svkVector* svkVec, void* pValue);
 void svkVector_PushBackCopy(svkVector* svkVec, void* pValue, size_t size);

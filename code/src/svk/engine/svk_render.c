@@ -66,12 +66,6 @@ internal VkResult CreateGraphicsPipeline(
     dynamicState.dynamicStateCount = SVK_ARRAY_SIZE(dynamicStates);
     dynamicState.pDynamicStates = dynamicStates;
 
-    // Vertex Input
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = SVK_ZMSTRUCT2(VkPipelineVertexInputStateCreateInfo);
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-
     // Input Assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = SVK_ZMSTRUCT2(VkPipelineInputAssemblyStateCreateInfo);
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -141,6 +135,17 @@ internal VkResult CreateGraphicsPipeline(
     if (result != VK_SUCCESS)
         return result;
 
+    // Vertex Input
+    VkVertexInputBindingDescription bindingDescription = svkVertex_GetBindingDescription();
+    VkVertexInputAttributeDescription* attributeDescriptions = svkVertex_GetAttribDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = SVK_ZMSTRUCT2(VkPipelineVertexInputStateCreateInfo);
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
+
     // Pipeline Info
     VkPipelineShaderStageCreateInfo* shaderStages = SVK_ZMSTRUCT(VkPipelineShaderStageCreateInfo, shaders->size);
     for (size_t i = 0; i < shaders->size; i++)
@@ -160,15 +165,20 @@ internal VkResult CreateGraphicsPipeline(
     pipelineInfo.layout = *outPipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
-
-    SVK_FREE(shaderStages); // maybe free after I use `pipelineInfo`, it might make a copy.
 
     // Pipeline
     result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, outPipeline);
     if (result != VK_SUCCESS)
+    {
+        SVK_FREE(shaderStages);
+        //SVK_FREE(attributeDescriptions);
         return result;
+    }
 
+    SVK_FREE(shaderStages);
+    //SVK_FREE(attributeDescriptions);
     return VK_SUCCESS;
 }
 
@@ -193,10 +203,10 @@ internal VkResult CreateRenderPass(
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkSubpassDescription subpass = SVK_ZMSTRUCT2(VkSubpassDescription);
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
+    VkSubpassDescription subpassDescription = SVK_ZMSTRUCT2(VkSubpassDescription);
+    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpassDescription.colorAttachmentCount = 1;
+    subpassDescription.pColorAttachments = &colorAttachmentRef;
 
     // Subpass Dependencies
     VkSubpassDependency dependency = SVK_ZMSTRUCT2(VkSubpassDependency);
@@ -213,7 +223,7 @@ internal VkResult CreateRenderPass(
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.pSubpasses = &subpassDescription;
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 

@@ -16,9 +16,13 @@ VkResult _svkEngine_CreateCommandBuffers(
 
 VkResult _svkEngine_RecordCommandBuffer(
     const VkCommandBuffer commandBuffer,
+    const VkBuffer vertexBuffer,
+    const VkBuffer indexBuffer,
     const u8 imageIndex,
     const VkRenderPass renderPass,
+    const VkClearValue clearColor,
     const SVKVECTOR_TYPE(VkFramebuffer) swapChainFramebuffers,
+    const SVKVECTOR_TYPE(svkDrawable) drawables,
     const VkExtent2D swapChainExtent,
     const VkPipeline graphicsPipeline);
 

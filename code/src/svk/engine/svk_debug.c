@@ -8,7 +8,7 @@ __DebugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
     void* pUserData) {
 
-    printf("Validation Layer: %s\n", callbackData->pMessage);
+    SVK_LogDebug("(VL) -> %s", callbackData->pMessage);
 
     return VK_FALSE;
 }

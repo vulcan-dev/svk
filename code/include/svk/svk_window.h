@@ -15,7 +15,6 @@ typedef struct svkWindow
     svkEngine* engine;
     SDL_Window* window;
 
-    void* updateCallbackUData;
     bool shouldClose;
 } svkWindow;
 

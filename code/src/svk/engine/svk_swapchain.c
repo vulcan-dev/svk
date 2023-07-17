@@ -1,14 +1,14 @@
 #include "svk/svk_engine.h"
 
-internal svkSwapChainSupportDetails QuerySwapChainSupport(
-    const VkPhysicalDevice physicalDevice,
-    const VkSurfaceKHR surface)
+internal svkSwapChainSupportDetails* QuerySwapChainSupport(
+    VkPhysicalDevice physicalDevice,
+    VkSurfaceKHR surface)
 {
-    svkSwapChainSupportDetails details = SVK_ZMSTRUCT2(svkSwapChainSupportDetails);
-    details.formats = svkVector_Create(0, sizeof(VkSurfaceFormatKHR));
-    details.presentModes = svkVector_Create(0, sizeof(VkPresentModeKHR));
+    svkSwapChainSupportDetails* details = SVK_ZMSTRUCT(svkSwapChainSupportDetails, 1);
+    details->formats = svkVector_Create(0, sizeof(VkSurfaceFormatKHR));
+    details->presentModes = svkVector_Create(0, 8);
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details->capabilities);
 
     // Get surface formats
     uint32_t formatCount = 0;
@@ -18,15 +18,15 @@ internal svkSwapChainSupportDetails QuerySwapChainSupport(
     
     if (formatCount != 0)
     {
-        svkVector_Resize(details.formats, formatCount);
-        VkSurfaceFormatKHR* surfaceFormats = SVK_ZMSTRUCT(VkSurfaceFormatKHR, formatCount);
-        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats);
+        svkVector_Resize(details->formats, formatCount);
+        VkSurfaceFormatKHR* tempSurfaceFormats = SVK_ZMSTRUCT(VkSurfaceFormatKHR, formatCount);
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, tempSurfaceFormats);
         if (result != VK_SUCCESS)
-            SDL_Log("Got bad result from vkGetPhysicalDeviceSurfaceFormatsKHR: %d", result);
+            SDL_Log("Got bad result from vkGetPhysicalDeviceSurfaceFormatsKHR: %d", result); // TODO: Actually handle.
 
         for (u32 i = 0; i < formatCount; i++)
-            svkVector_PushBackCopy(details.formats, &surfaceFormats[i], sizeof(VkSurfaceFormatKHR));
-        SVK_FREE(surfaceFormats);
+            svkVector_PushBackCopy(details->formats, &tempSurfaceFormats[i], sizeof(VkSurfaceFormatKHR));
+        SVK_FREE(tempSurfaceFormats);
     }
     
     // Get present modes
@@ -37,15 +37,16 @@ internal svkSwapChainSupportDetails QuerySwapChainSupport(
     
     if (presentModeCount != 0)
     {
-        svkVector_Resize(details.presentModes, presentModeCount);
-        VkPresentModeKHR* presentModes = SVK_ZMSTRUCT(VkPresentModeKHR, presentModeCount);
-        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes);
-        if (result != VK_SUCCESS)
-            SDL_Log("Got bad result from vkGetPhysicalDeviceSurfacePresentModesKHR: %d", result);
+        svkVector_Resize(details->presentModes, presentModeCount);
 
-        for (u32 i = 0; i < presentModeCount; i++)
-            svkVector_PushBackCopy(details.presentModes, &presentModes[i], sizeof(VkPresentModeKHR));
-        SVK_FREE(presentModes);
+        VkPresentModeKHR* tempPresentModes = SVK_MALLOC(8 * presentModeCount);
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, tempPresentModes);
+        if (result != VK_SUCCESS)
+            SDL_Log("Got bad result from vkGetPhysicalDeviceSurfacePresentModesKHR: %d", result); // TODO: Actually handle.
+
+        for (size_t i = 0; i < presentModeCount; i++)
+            svkVector_PushBackCopy(details->presentModes, &tempPresentModes[i], 8);
+        SVK_FREE(tempPresentModes);
     }
 
     return details;
@@ -55,11 +56,14 @@ internal VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
     const SVKVECTOR_TYPE(VkSurfaceFormatKHR) availableFormats,
     VkResult* outResult)
 {
+    const int colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
+    //const int colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
+
     *outResult = VK_SUCCESS;
     for (u32 i = 0; i < availableFormats->size; i++)
     {
         const VkSurfaceFormatKHR availableFormat = *(VkSurfaceFormatKHR*)availableFormats->data[i];
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        if (availableFormat.format == colorFormat && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             return availableFormat;
     }
     
@@ -113,18 +117,18 @@ internal VkResult CreateSwapChain(
     const VkSurfaceKHR surface,
     SDL_Window* window)
 {
-    svkSwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(physicalDevice, surface);
+    svkSwapChainSupportDetails* swapChainSupport = QuerySwapChainSupport(physicalDevice, surface);
     VkResult result;
 
-    VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats, &result);
+    VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport->formats, &result);
     if (result != VK_SUCCESS)
         return result;
 
-    VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = ChooseSwapExtent(&swapChainSupport.capabilities, window);
+    VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport->presentModes);
+    VkExtent2D extent = ChooseSwapExtent(&swapChainSupport->capabilities, window);
 
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    const uint32_t maxImageCount = swapChainSupport.capabilities.maxImageCount;
+    uint32_t imageCount = swapChainSupport->capabilities.minImageCount + 1;
+    const uint32_t maxImageCount = swapChainSupport->capabilities.maxImageCount;
 
     if (maxImageCount > 0 && imageCount > maxImageCount)
         imageCount = maxImageCount;
@@ -139,7 +143,7 @@ internal VkResult CreateSwapChain(
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+    createInfo.preTransform = swapChainSupport->capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
@@ -163,8 +167,9 @@ internal VkResult CreateSwapChain(
         createInfo.pQueueFamilyIndices = NULL;
     }
 
-    svkVector_Free(swapChainSupport.formats);
-    svkVector_Free(swapChainSupport.presentModes);
+    svkVector_Free(swapChainSupport->formats);
+    svkVector_Free(swapChainSupport->presentModes);
+    SVK_FREE(swapChainSupport);
 
     result = vkCreateSwapchainKHR(device, &createInfo, NULL, outSwapchain);
     if (result != VK_SUCCESS)

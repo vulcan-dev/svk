@@ -1,7 +1,31 @@
 #include "svk/svk.h"
 
+const svkVertex triangleVertices[3] =
+{
+    {{ 0.0f, -0.5f }, { 0.99f, 0.02f, 0.99f }},
+    {{ 0.5f,  0.5f }, { 0.99f, 0.99f, 0.02f }},
+    {{ -0.5f, 0.5f }, { 0.02f, 0.99f, 0.99f }}
+};
+
+const svkVertex triangleVertices2[3] =
+{
+    {{ 0.7f, -0.7f }, { 0.02f, 0.99f, 0.99f }},
+    {{ 0.7f,  0.7f }, { 0.99f, 0.99f, 0.02f }},
+    {{ -0.7f, 0.7f }, { 0.99f, 0.02f, 0.99f }}
+};
+
+const svkVertex rectVertices[4] = {
+    {{ -0.5f, -0.5f }, { 0.99f, 0.02f, 0.99f }},
+    {{  0.5f, -0.5f }, { 0.02f, 0.56f, 0.99f }},
+    {{  0.5f,  0.5f }, { 0.02f, 0.99f, 0.99f }},
+    {{ -0.5f,  0.5f }, { 0.99f, 0.99f, 0.02f }}
+};
+
+const uint16_t rectIndices[6] = { 0, 1, 2, 2, 3, 0 };
+
 int main(void)
 {
+    // Birth
     svkEngine* svke = svkEngine_Create("SVK Engine", VK_MAKE_API_VERSION(0, 1, 0, 0));
     svkWindow* svkw = svkWindow_Create(svke, "Vulkan Engine",
         (svkVec2){ SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED },
@@ -16,15 +40,22 @@ int main(void)
         svkEngine_Destroy(svke);
         return -1;
     }
+    
+    //svkDrawable* drawable = svkDrawable_Create(triangleVertices, 3, NULL, 0);
+    svkDrawable* drawable2 = svkDrawable_Create(rectVertices, 4, rectIndices, 6);
+    //svkScene_AddDrawable(svke, drawable);
+    svkScene_AddDrawable(svke, drawable2);
 
+    // Living life
     SDL_ShowWindow(svkw->window);
 
     svkEvent event;
     while (svkWindow_Update(svkw, &event))
     {
-        
+
     }
 
+    // Sad death
     svkWindow_Destroy(svkw);
     svkEngine_Destroy(svke);
 

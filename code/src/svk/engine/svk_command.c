@@ -36,9 +36,13 @@ VkResult _svkEngine_CreateCommandBuffers(
 
 VkResult _svkEngine_RecordCommandBuffer(
     const VkCommandBuffer commandBuffer,
+    const VkBuffer vertexBuffer,
+    const VkBuffer indexBuffer,
     const u8 imageIndex,
     const VkRenderPass renderPass,
+    const VkClearValue clearColor,
     const SVKVECTOR_TYPE(VkFramebuffer) swapChainFramebuffers,
+    const SVKVECTOR_TYPE(svkDrawable) drawables,
     const VkExtent2D swapChainExtent,
     const VkPipeline graphicsPipeline)
 {
@@ -61,7 +65,6 @@ VkResult _svkEngine_RecordCommandBuffer(
     renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
     renderPassInfo.renderArea.extent = swapChainExtent;
 
-    VkClearValue clearColor = {{{ 0.0f, 0.0f, 0.0f, 1.0f }}};
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
 
@@ -82,7 +85,25 @@ VkResult _svkEngine_RecordCommandBuffer(
     scissor.extent = swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    VkBuffer vertexBuffers[] = { vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+
+    for (size_t i = 0; i < drawables->size; i++)
+    {
+        const svkDrawable* drawable = (svkDrawable*)drawables->data[i];
+
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+        if (drawable->indices->size > 0)
+        {
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdDrawIndexed(commandBuffer, drawable->indices->size, 1, 0, 0, 0);
+        } else
+        {
+            vkCmdDraw(commandBuffer, (uint32_t)drawable->vertices->size, 1, 0, 0);
+        }
+    }
+
     vkCmdEndRenderPass(commandBuffer);
 
     result = vkEndCommandBuffer(commandBuffer);

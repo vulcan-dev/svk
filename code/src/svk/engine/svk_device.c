@@ -44,10 +44,11 @@ internal bool IsDeviceSuitable(VkPhysicalDevice physicalDevice, VkSurfaceKHR sur
     bool swapChainAdequate = false;
     if (extensionsSupported)
     {
-        svkSwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(physicalDevice, surface);
-        swapChainAdequate = swapChainSupport.formats->size > 0 && swapChainSupport.presentModes->size > 0;
-        svkVector_Free(swapChainSupport.formats);
-        svkVector_Free(swapChainSupport.presentModes);
+        svkSwapChainSupportDetails* swapChainSupport = QuerySwapChainSupport(physicalDevice, surface);
+        swapChainAdequate = swapChainSupport->formats->size > 0 && swapChainSupport->presentModes->size > 0;
+        svkVector_Free(swapChainSupport->formats);
+        svkVector_Free(swapChainSupport->presentModes);
+        SVK_FREE(swapChainSupport);
     }
 
     const svkQueueFamilyIndices indices = _svkEngine_FindQueueFamilies(physicalDevice, surface);
@@ -71,7 +72,7 @@ internal SvkResult PickPhysicalDevice(VkInstance instance, VkPhysicalDevice* out
         VkPhysicalDeviceProperties deviceProperties;
         for (u32 i = 0; i < deviceCount; i++)
         {
-            const VkPhysicalDevice device = devices[i];
+            VkPhysicalDevice device = devices[i];
             if (!IsDeviceSuitable(device, surface))
                 continue;
 
@@ -85,7 +86,7 @@ internal SvkResult PickPhysicalDevice(VkInstance instance, VkPhysicalDevice* out
         }
     } else
     {
-        if (devices[0] == VK_NULL_HANDLE)
+        if (&devices[0] == VK_NULL_HANDLE)
         {
             SVK_FREE(devices);
             return SVK_ERROR_NO_SUITABLE_DEVICE;
@@ -108,29 +109,29 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
 {
     svkQueueFamilyIndices indices = _svkEngine_FindQueueFamilies(physicalDevice, surface);
 
-    svkVector* queueCreateInfos = svkVector_Create(2, sizeof(VkDeviceQueueCreateInfo));
-    svkVector* uniqueQueueCreateInfos = svkVector_Create(2, sizeof(svkQueueFamilyIndices));
-    SVKVECTOR_PUSHBACK(uniqueQueueCreateInfos, indices.graphicsFamily);
-    SVKVECTOR_PUSHBACK(uniqueQueueCreateInfos, indices.presentFamily);
+    VkDeviceQueueCreateInfo queueCreateInfos[2];
+    uint32_t uniqueQueueFamilies[2] =
+    {
+        indices.graphicsFamily,
+        indices.presentFamily
+    };
 
     float queuePriority = 1.0f;
-    for (u32 i = 0; i < uniqueQueueCreateInfos->size; i++)
+    for (u32 i = 0; i < 2; i++)
     {
-        VkDeviceQueueCreateInfo* queueCreateInfo = SVK_ZMSTRUCT(VkDeviceQueueCreateInfo, 1);
-        queueCreateInfo->sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo->queueFamilyIndex = (uint32_t)uniqueQueueCreateInfos->data[i];
-        queueCreateInfo->queueCount = 1;
-        queueCreateInfo->pQueuePriorities = &queuePriority;
-        SVKVECTOR_PUSHBACK(queueCreateInfos, queueCreateInfo);
+        VkDeviceQueueCreateInfo queueCreateInfo = SVK_ZMSTRUCT2(VkDeviceQueueCreateInfo);
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = uniqueQueueFamilies[i];
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos[i] = queueCreateInfo;
     }
-
-    VkDeviceQueueCreateInfo* infos = SVKVECTOR_CONVERT(queueCreateInfos, VkDeviceQueueCreateInfo);
 
     VkPhysicalDeviceFeatures deviceFeatures = SVK_ZMSTRUCT2(VkPhysicalDeviceFeatures);
     VkDeviceCreateInfo createInfo = SVK_ZMSTRUCT2(VkDeviceCreateInfo);
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = infos;
-    createInfo.queueCreateInfoCount = queueCreateInfos->size;
+    createInfo.pQueueCreateInfos = queueCreateInfos;
+    createInfo.queueCreateInfoCount = SVK_ARRAY_SIZE(queueCreateInfos);
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = SVK_ARRAY_SIZE(deviceExtensions);
     createInfo.ppEnabledExtensionNames = deviceExtensions;
@@ -147,10 +148,6 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
     const VkResult result = vkCreateDevice(physicalDevice, &createInfo, NULL, outDevice);
     if (result != VK_SUCCESS)
         return result;
-
-    svkVector_Free(uniqueQueueCreateInfos);
-    svkVector_FreeWithData(queueCreateInfos);
-    SVK_FREE(infos);
 
     vkGetDeviceQueue(*outDevice, indices.graphicsFamily, 0, &queues->graphics);
     vkGetDeviceQueue(*outDevice, indices.presentFamily, 0, &queues->present);

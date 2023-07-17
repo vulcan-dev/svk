@@ -7,6 +7,8 @@
 #include "engine/svk_render.c"
 
 #include <SDL2/SDL_vulkan.h>
+#include <cpuid.h>
+#include <Windows.h>
 
 #define VALIDATION_LAYER_ENABLED true // TODO: Make it a variable
 
@@ -14,7 +16,7 @@ local const char* validationLayers[1] = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-local SvkResult lastErrorCode = SVK_SUCCESS; // svk_engine.h
+SvkResult lastErrorCode = SVK_SUCCESS; // svk_engine.h
 SvkResult SVK_GetLastError() {
     return lastErrorCode;
 }
@@ -165,6 +167,7 @@ svkEngine* svkEngine_Create(const char* appName, const u32 appVersion)
 {
     svkEngine* svke = SVK_ZMSTRUCT(svkEngine, 1);
     svke->swapChain = SVK_ZMSTRUCT(struct _svkEngineSwapChain, 1);
+    svke->scene = SVK_ZMSTRUCT(struct _svkEngineScene, 1);
 
     svke->info = (struct _svkEngineInfo){
         appVersion,
@@ -216,8 +219,10 @@ VkResult svkEngine_RecreateSwapChain(
     return VK_SUCCESS;
 }
 
-bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
+VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
 {
+    SVK_LogInfo("Setting engine up...");
+
     // Application Info
     VkApplicationInfo appInfo = SVK_ZMSTRUCT2(VkApplicationInfo);
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -230,7 +235,7 @@ bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     // Instance Info
     svkVector* extensions = GetRequiredExtensions(window);
     if (extensions == NULL)
-        return false;
+        return VK_ERROR_UNKNOWN;
 
     VkInstanceCreateInfo createInfo = SVK_ZMSTRUCT2(VkInstanceCreateInfo);
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -242,7 +247,7 @@ bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     {
         lastErrorCode = SVK_ERROR_VALIDATE_LAYER_SUPPORT;
         SVK_FREE(extensions);
-        return false;
+        return VK_ERROR_UNKNOWN;
     }
 
     // Debug Messenger
@@ -266,32 +271,72 @@ bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     {
         lastErrorCode = SVK_ERROR_CREATE_INSTANCE;
         SVK_FREE(extensions);
-        return false;
+        return VK_ERROR_UNKNOWN;
     }
 
     SVK_FREE(extensions);
 
     svke->core.instance = instance;
+    VkResult result = VK_SUCCESS;
 
     // Setup everything else from here on
     if (VALIDATION_LAYER_ENABLED)
-        SetupDebugMessenger(&svke->core.instance, &svke->debugMessenger);
+    {
+        result = SetupDebugMessenger(&svke->core.instance, &svke->debugMessenger);
+        if (result != VK_SUCCESS)
+            return result;
+    }
 
     // Create surface
     if (SDL_Vulkan_CreateSurface(window, instance, &svke->core.surface) == SDL_FALSE)
-        return false;
+        return VK_ERROR_UNKNOWN;
 
     // Pick physical device
     lastErrorCode = PickPhysicalDevice(instance, &svke->core.physicalDevice, svke->core.surface);
     if (lastErrorCode != SVK_SUCCESS)
-        return false;
+        return VK_ERROR_UNKNOWN;
+
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(svke->core.physicalDevice, &deviceProperties);
+
+    SVK_LogInfo("Found GPU:");
+    SVK_LogInfo("    Name: %s", deviceProperties.deviceName);
+    SVK_LogInfo("    Vendor ID: %d", deviceProperties.vendorID);
+    SVK_LogInfo("    Device ID: %d", deviceProperties.deviceID);
+    SVK_LogInfo("    API Version: %d.%d.%d",
+                VK_VERSION_MAJOR(deviceProperties.apiVersion),
+                VK_VERSION_MINOR(deviceProperties.apiVersion),
+                VK_VERSION_PATCH(deviceProperties.apiVersion));
+
+    unsigned int eax, ebx, ecx, edx;
+    char vendor[13] = {0};
+    char brand[49] = {0};
+
+    // Retrieve vendor string
+    __cpuid(0, eax, ebx, ecx, edx);
+    memcpy(vendor, &ebx, 4);
+    memcpy(vendor + 4, &edx, 4);
+    memcpy(vendor + 8, &ecx, 4);
+
+    // Retrieve brand string
+    for (int i = 0x80000002; i <= 0x80000004; ++i) {
+        __cpuid(i, eax, ebx, ecx, edx);
+        memcpy(brand + (i - 0x80000002) * 16, &eax, 4);
+        memcpy(brand + (i - 0x80000002) * 16 + 4, &ebx, 4);
+        memcpy(brand + (i - 0x80000002) * 16 + 8, &ecx, 4);
+        memcpy(brand + (i - 0x80000002) * 16 + 12, &edx, 4);
+    }
+
+    SVK_LogInfo("CPU Vendor: %s", vendor);
+    SVK_LogInfo("CPU Brand: %s", brand);
 
     // Create logical device
-    if (CreateLogicalDevice(svke->core.physicalDevice, &svke->core.device, &svke->core.queues, svke->core.surface, VALIDATION_LAYER_ENABLED, validationLayers) != VK_SUCCESS)
-        return false;
+    result = CreateLogicalDevice(svke->core.physicalDevice, &svke->core.device, &svke->core.queues, svke->core.surface, VALIDATION_LAYER_ENABLED, validationLayers);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Create swapchain
-    CreateSwapChain(
+    result = CreateSwapChain(
         &svke->swapChain->swapChain,
         &svke->swapChain->images,
         &svke->swapChain->imageFormat,
@@ -300,34 +345,42 @@ bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
         svke->core.physicalDevice,
         svke->core.surface,
         window);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Create image views
-    CreateImageViews(svke->swapChain->images, &svke->swapChain->imageViews, svke->core.device, svke->swapChain->imageFormat);
+    result = CreateImageViews(svke->swapChain->images, &svke->swapChain->imageViews, svke->core.device, svke->swapChain->imageFormat);
+    if (result != VK_SUCCESS)
+        return result;
     
     // Create render pass
-    CreateRenderPass(svke->core.device, svke->swapChain->imageFormat, &svke->core.renderPass);
+    result = CreateRenderPass(svke->core.device, svke->swapChain->imageFormat, &svke->core.renderPass);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Setup shaders for pipeline
     svke->core.shaders = svkVector_Create(2, sizeof(svkShader));
     svkShader* coreVertexShader = svkShader_CreateFromFile(svke->core.device, "rom/shaders/compiled/vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     if (coreVertexShader == NULL)
-        return false;
+        return VK_ERROR_UNKNOWN;
 
     svkShader* coreFragmentShader = svkShader_CreateFromFile(svke->core.device, "rom/shaders/compiled/frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     if (coreFragmentShader == NULL)
-        return false;
+        return VK_ERROR_UNKNOWN;
 
     svkVector_PushBack(svke->core.shaders, coreVertexShader);
     svkVector_PushBack(svke->core.shaders, coreFragmentShader);
 
     // Create graphics pipeline
-    CreateGraphicsPipeline(
+    result = CreateGraphicsPipeline(
         svke->core.device,
         svke->core.shaders,
         svke->swapChain->extent,
         svke->core.renderPass,
         &svke->core.graphicsPipeline,
         &svke->core.pipelineLayout);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Create framebuffers
     CreateFrameBuffers(
@@ -338,22 +391,60 @@ bool _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
         &svke->swapChain->frameBuffers);
 
     // Create command pool
-    _svkEngine_CreateCommandPool(svke->core.device, svke->core.physicalDevice, svke->core.surface, &svke->core.commandPool);
+    result = _svkEngine_CreateCommandPool(svke->core.device, svke->core.physicalDevice, svke->core.surface, &svke->core.commandPool);
+    if (result != VK_SUCCESS)
+        return result;
+
+    // TEMP
+    svke->scene->drawables = svkVector_Create(1, sizeof(svkDrawable)); // TODO: Do this somewhere else & implement `svkVector_Resize`
 
     // Create command buffer
-    _svkEngine_CreateCommandBuffers(svke->core.device, svke->core.commandPool, &svke->core.commandBuffers);
+    result = _svkEngine_CreateCommandBuffers(svke->core.device, svke->core.commandPool, &svke->core.commandBuffers);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Create sync objects
-    CreateSyncObjects(svke->core.device, &svke->core.renderer);
+    result = CreateSyncObjects(svke->core.device, &svke->core.renderer);
+    if (result != VK_SUCCESS)
+        return result;
 
-    return true;
+    // Finish up
+    svke->core.renderer.clearColor = (VkClearValue){{{ 0.11f, 0.13f, 0.18f, 1.0f }}};
+
+    return VK_SUCCESS;
+}
+
+svkDrawable* svkDrawable_Create(
+    const svkVertex* vertices,
+    const uint16_t vertexCount,
+    const uint16_t* indices,
+    const uint16_t indexCount)
+{
+    svkDrawable* drawable = SVK_ZMSTRUCT(svkDrawable, 1);
+    drawable->vertices = svkVector_Create(vertexCount, sizeof(svkVertex));
+    drawable->indices = svkVector_Create(indexCount, 8);
+
+    for (uint16_t i = 0; i < vertexCount; i++)
+        svkVector_PushBack(drawable->vertices, (void*)&vertices[i]);
+
+    for (uint16_t i = 0; i < indexCount; i++)
+        svkVector_PushBack(drawable->indices, (void*)&indices[i]);
+
+    return drawable;
 }
 
 void svkEngine_Destroy(svkEngine* svke)
 {
-    SVK_ASSERT(svke == NULL, "svke is NULL!");
+    SVK_LogInfo("Destroying!");
+    SVK_ASSERT(svke, "svke is NULL!");
 
     CleanupSwapChain(svke->core.device, svke->swapChain);
+
+    vkDestroyBuffer(svke->core.device, svke->core.vertexBuffer, VK_NULL_HANDLE);
+    vkFreeMemory(svke->core.device, svke->core.vertexBufferMemory, VK_NULL_HANDLE);
+
+    vkDestroyBuffer(svke->core.device, svke->core.indexBuffer, VK_NULL_HANDLE);
+    vkFreeMemory(svke->core.device, svke->core.indexBufferMemory, VK_NULL_HANDLE);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -387,6 +478,12 @@ void svkEngine_Destroy(svkEngine* svke)
     svkVector_Free(svke->swapChain->images);
     svkVector_Free(svke->swapChain->imageViews);
 
+    for (size_t i = 0; i < svke->scene->drawables->size; i++)
+        SVK_FREE(svke->scene->drawables->data[i]);
+
+    svkVector_Free(svke->scene->drawables);
+
+    SVK_FREE(svke->scene);
     SVK_FREE(svke->swapChain);
     SVK_FREE(svke);
 }

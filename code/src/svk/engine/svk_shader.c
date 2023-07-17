@@ -1,5 +1,6 @@
 #include "svk/engine/svk_shader.h"
 #include "svk/util/svk_filesystem.h"
+#include "svk/util/svk_logger.h"
 #include "svk/svk_common.h"
 
 typedef struct svkShaderCreateResult
@@ -55,7 +56,7 @@ svkShader* svkShader_CreateFromFile(
     shader->stageInfo.module = shader->shader;
     shader->stageInfo.pName = "main";
 
-    printf("Loaded shader: \"%s\"\n", filename);
+    SVK_LogDebug("Loaded shader: \"%s\", type: %d", filename, type);
 
     return shader;
 }
