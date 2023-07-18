@@ -4,6 +4,7 @@
 #include <string.h> // for memset
 #include <assert.h>
 #include <stdlib.h>
+#include "svk/util/svk_assert.h"
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -25,6 +26,11 @@ typedef unsigned char bool;
 #define SVK_ZM(dest, size) memset(&dest, 0, size)
 #define SVK_ZMA(dest) SVK_ZM(dest, sizeof(dest))
 
+#define SVK_CHECK_VKRESULT(result, msg, ...) \
+    do { \
+        SVK_ASSERT(result == VK_SUCCESS, msg, __VA_ARGS__) \
+    } while (0)
+    
 #define SVK_ARRAY_SIZE(x) (sizeof((x)) / sizeof((x)[0]))
 
 #define SVK_ALLOCSTRUCT(type, count) \

@@ -15,12 +15,13 @@ VkResult _svkEngine_CreateCommandBuffers(
     SVKARRAY_TYPE(VkCommandBuffer)* commandBuffer);
 
 VkResult _svkEngine_RecordCommandBuffer(
+    const VkDevice device,
     const VkCommandBuffer commandBuffer,
-    const VkBuffer vertexBuffer,
-    const VkBuffer indexBuffer,
     const u8 imageIndex,
     const VkRenderPass renderPass,
     const VkClearValue clearColor,
+    VkQueryPool timeQueryPool,
+    const uint32_t currentFrame,
     const SVKVECTOR_TYPE(VkFramebuffer) swapChainFramebuffers,
     const SVKVECTOR_TYPE(svkDrawable) drawables,
     const VkExtent2D swapChainExtent,

@@ -170,16 +170,10 @@ internal VkResult CreateGraphicsPipeline(
 
     // Pipeline
     result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, outPipeline);
-    if (result != VK_SUCCESS)
-    {
-        SVK_FREE(shaderStages);
-        //SVK_FREE(attributeDescriptions);
-        return result;
-    }
-
+    
     SVK_FREE(shaderStages);
-    //SVK_FREE(attributeDescriptions);
-    return VK_SUCCESS;
+    SVK_FREE(attributeDescriptions);
+    return result;
 }
 
 internal VkResult CreateRenderPass(

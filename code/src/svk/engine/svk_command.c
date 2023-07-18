@@ -35,12 +35,13 @@ VkResult _svkEngine_CreateCommandBuffers(
 }
 
 VkResult _svkEngine_RecordCommandBuffer(
+    const VkDevice device,
     const VkCommandBuffer commandBuffer,
-    const VkBuffer vertexBuffer,
-    const VkBuffer indexBuffer,
     const u8 imageIndex,
     const VkRenderPass renderPass,
     const VkClearValue clearColor,
+    VkQueryPool timeQueryPool,
+    const uint32_t currentFrame,
     const SVKVECTOR_TYPE(VkFramebuffer) swapChainFramebuffers,
     const SVKVECTOR_TYPE(svkDrawable) drawables,
     const VkExtent2D swapChainExtent,
@@ -68,44 +69,49 @@ VkResult _svkEngine_RecordCommandBuffer(
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
 
+    // Begin Render Pass
+    vkCmdResetQueryPool(commandBuffer, timeQueryPool, currentFrame * 2, 2);
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timeQueryPool, currentFrame * 2);
+
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-    VkViewport viewport;
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)swapChainExtent.width;
-    viewport.height = (float)swapChainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor;
-    scissor.offset = (VkOffset2D){ 0, 0 };
-    scissor.extent = swapChainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    VkBuffer vertexBuffers[] = { vertexBuffer };
-    VkDeviceSize offsets[] = { 0 };
-
-    for (size_t i = 0; i < drawables->size; i++)
     {
-        const svkDrawable* drawable = (svkDrawable*)drawables->data[i];
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        VkViewport viewport;
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)swapChainExtent.width;
+        viewport.height = (float)swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-        if (drawable->indices->size > 0)
+        VkRect2D scissor;
+        scissor.offset = (VkOffset2D){ 0, 0 };
+        scissor.extent = swapChainExtent;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        VkDeviceSize offsets[] = { 0 };
+
+        for (size_t i = 0; i < drawables->size; i++)
         {
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(commandBuffer, drawable->indices->size, 1, 0, 0, 0);
-        } else
-        {
-            vkCmdDraw(commandBuffer, (uint32_t)drawable->vertices->size, 1, 0, 0);
+            const svkDrawable* drawable = (svkDrawable*)drawables->data[i];
+            VkBuffer buffer[1] = { drawable->buffers.vertexBuffer };
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffer, offsets);
+
+            if (drawable->indices->size > 0)
+            {
+                vkCmdBindIndexBuffer(commandBuffer, drawable->buffers.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(commandBuffer, drawable->indices->size, 1, 0, 0, 0);
+            } else
+            {
+                vkCmdDraw(commandBuffer, (uint32_t)drawable->vertices->size, 1, 0, 0);
+            }
         }
     }
 
     vkCmdEndRenderPass(commandBuffer);
-
-    result = vkEndCommandBuffer(commandBuffer);
-    return result;
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timeQueryPool, currentFrame * 2 + 1);
+    return vkEndCommandBuffer(commandBuffer);
 }

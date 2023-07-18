@@ -58,6 +58,7 @@ struct _svkEngineSwapChain
 struct _svkEngineScene
 {
     SVKVECTOR_TYPE(svkDrawable) drawables;
+    struct svkCamera* camera;
 };
 
 struct _svkEngineRenderer
@@ -66,6 +67,11 @@ struct _svkEngineRenderer
     SVKARRAY_TYPE(VkSemaphore) renderFinishedSemaphores;
     SVKARRAY_TYPE(VkFence) inFlightFences;
     VkClearValue clearColor;
+};
+
+struct _svkEngineDebug
+{
+    float gpuTime;
 };
 
 struct _svkEngineCore
@@ -86,11 +92,7 @@ struct _svkEngineCore
     VkRenderPass renderPass;
     VkCommandPool commandPool;
 
-    VkBuffer vertexBuffer;
-    VkBuffer indexBuffer;
-
-    VkDeviceMemory vertexBufferMemory;
-    VkDeviceMemory indexBufferMemory;
+    VkQueryPool timeQueryPool;
 
     SVKARRAY_TYPE(VkCommandBuffer) commandBuffers;
 };
@@ -99,6 +101,14 @@ struct _svkEngineCore
 //------------------------------------------------------------------------
 typedef struct svkWindow svkWindow;
 typedef struct SDL_Window SDL_Window;
+
+typedef struct _svkEngineDrawableData
+{
+    VkBuffer vertexBuffer;
+    VkBuffer indexBuffer;
+    VkDeviceMemory vertexMemory;
+    VkDeviceMemory indexMemory;
+} _svkEngineDrawableData;
 
 typedef struct svkQueueFamilyIndices
 {
@@ -116,7 +126,13 @@ typedef struct svkDrawable
 {
     SVKVECTOR_TYPE(svkVertex) vertices;
     SVKVECTOR_TYPE(uint16_t) indices;
+    _svkEngineDrawableData buffers;
 } svkDrawable;
+
+typedef struct svkCamera
+{
+
+} svkCamera;
 
 typedef struct svkEngine
 {
@@ -124,6 +140,7 @@ typedef struct svkEngine
     struct _svkEngineInfo info;
     struct _svkEngineScene* scene;
     struct _svkEngineSwapChain* swapChain;
+    struct _svkEngineDebug debug;
 
     VkDebugUtilsMessengerEXT debugMessenger;
 } svkEngine;

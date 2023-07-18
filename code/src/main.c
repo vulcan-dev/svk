@@ -1,17 +1,18 @@
 #include "svk/svk.h"
+#include <time.h>
 
 const svkVertex triangleVertices[3] =
 {
-    {{ 0.0f, -0.5f }, { 0.99f, 0.02f, 0.99f }},
-    {{ 0.5f,  0.5f }, { 0.99f, 0.99f, 0.02f }},
-    {{ -0.5f, 0.5f }, { 0.02f, 0.99f, 0.99f }}
+    {{  0.0f,  -0.15f }, { 0.99f, 0.02f, 0.99f }},
+    {{  0.15f,  0.15f }, { 0.99f, 0.99f, 0.02f }},
+    {{ -0.15f,  0.15f }, { 0.02f, 0.99f, 0.99f }}
 };
 
 const svkVertex triangleVertices2[3] =
 {
-    {{ 0.7f, -0.7f }, { 0.02f, 0.99f, 0.99f }},
-    {{ 0.7f,  0.7f }, { 0.99f, 0.99f, 0.02f }},
-    {{ -0.7f, 0.7f }, { 0.99f, 0.02f, 0.99f }}
+    {{  0.7f, -0.7f }, { 0.02f, 0.99f, 0.99f }},
+    {{  0.7f,  0.7f }, { 0.99f, 0.99f, 0.02f }},
+    {{ -0.7f,  0.7f }, { 0.99f, 0.02f, 0.99f }}
 };
 
 const svkVertex rectVertices[4] = {
@@ -19,6 +20,13 @@ const svkVertex rectVertices[4] = {
     {{  0.5f, -0.5f }, { 0.02f, 0.56f, 0.99f }},
     {{  0.5f,  0.5f }, { 0.02f, 0.99f, 0.99f }},
     {{ -0.5f,  0.5f }, { 0.99f, 0.99f, 0.02f }}
+};
+
+const svkVertex rectVertices2[4] = {
+    {{ -0.25f, -0.25f }, { 0.02f, 0.99f, 0.99f }},
+    {{  0.25f, -0.25f }, { 0.99f, 0.99f, 0.02f }},
+    {{  0.25f,  0.25f }, { 0.99f, 0.02f, 0.99f }},
+    {{ -0.25f,  0.25f }, { 0.02f, 0.56f, 0.99f }}
 };
 
 const uint16_t rectIndices[6] = { 0, 1, 2, 2, 3, 0 };
@@ -40,11 +48,15 @@ int main(void)
         svkEngine_Destroy(svke);
         return -1;
     }
+
+    srand((unsigned int)time(NULL));
     
-    //svkDrawable* drawable = svkDrawable_Create(triangleVertices, 3, NULL, 0);
-    svkDrawable* drawable2 = svkDrawable_Create(rectVertices, 4, rectIndices, 6);
-    //svkScene_AddDrawable(svke, drawable);
+    svkDrawable* drawable = svkDrawable_Create(rectVertices, 4, rectIndices, 6);
+    svkDrawable* drawable2 = svkDrawable_Create(rectVertices2, 4, rectIndices, 6);
+    svkDrawable* drawable3 = svkDrawable_Create(triangleVertices, 3, NULL, 0);
+    svkScene_AddDrawable(svke, drawable);
     svkScene_AddDrawable(svke, drawable2);
+    svkScene_AddDrawable(svke, drawable3);
 
     // Living life
     SDL_ShowWindow(svkw->window);

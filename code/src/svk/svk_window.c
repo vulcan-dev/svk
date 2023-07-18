@@ -11,6 +11,7 @@ svkWindow* svkWindow_Create(svkEngine* svke, const char* title, svkVec2 size, sv
 {
     SVK_LogInfo("Creating window...");
     svkWindow* svkw = SVK_ZMSTRUCT(svkWindow, 1);
+    svkw->title = title;
 
     svkw->window = SDL_CreateWindow(title, size.x, size.y, position.x, position.y, flags);
     if (!svkw->window)
@@ -49,15 +50,20 @@ bool svkWindow_Update(svkWindow* svkw, SDL_Event* event)
         svke->core.physicalDevice,
         svke->core.surface,
         svke->core.device,
-        svke->core.vertexBuffer,
-        svke->core.indexBuffer,
+        svke->core.commandPool,
+        svke->core.timeQueryPool,
         svke->core.commandBuffers,
         svke->scene->drawables,
         svke->core.graphicsPipeline,
         svke->core.renderPass,
         svke->swapChain,
         svke->core.queues,
+        &svke->debug,
         &svke->core.renderer);
+
+    char newTitle[256];
+    sprintf_s(newTitle, 256, "%s (RenderTime: %fms)", svkw->title, svke->debug.gpuTime);
+    SDL_SetWindowTitle(svkw->window, newTitle);
 
     return true;
 }
@@ -79,6 +85,7 @@ void svkWindow_Destroy(svkWindow* svkw)
 
 // Internal Functions
 //------------------------------------------------------------------------
+int mouseX, mouseY;
 internal void _svkWindow_HandleEvents(svkWindow* svkw, SDL_Event event)
 {
     int mx, my = 0;
@@ -89,8 +96,7 @@ internal void _svkWindow_HandleEvents(svkWindow* svkw, SDL_Event event)
             break;
         case SDL_MOUSEMOTION:
         {
-            SDL_GetMouseState(&mx, &my);
-            //SVK_LogDebug("Mouse Move: %d, %d", mx, my);
+            //SDL_GetMouseState(&mx, &my);
         }
     }
 }

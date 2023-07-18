@@ -56,10 +56,7 @@ svkVector_PushBack(svkVector* svkVec, void* pValue)
 {
     SVK_ASSERT(svkVec, "svkVector is NULL!");
     if (svkVec->size >= svkVec->cap)
-    {
-        svkVector_Resize(svkVec, svkVec->cap * 2);
-        return;
-    }
+        svkVector_Resize(svkVec, svkVec->cap == 0 ? 2 : svkVec->cap * 2);
 
     svkVec->data[svkVec->size] = pValue;
     svkVec->size++;

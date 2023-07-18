@@ -15,6 +15,7 @@ typedef struct svkWindow
     svkEngine* engine;
     SDL_Window* window;
 
+    const char* title;
     bool shouldClose;
 } svkWindow;
 

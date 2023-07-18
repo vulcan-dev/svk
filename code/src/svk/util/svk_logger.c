@@ -4,8 +4,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
-#include <Shlwapi.h> // Include Shlwapi.h for PathFindFileName function
-#pragma comment(lib, "Shlwapi.lib") // Link with Shlwapi.lib
+#include <Shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
 
 // Globals
 //------------------------------------------------------------------------
@@ -24,7 +24,6 @@ void SVK_Log(const u8 level, const char* file, u16 line, const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    // Get the current time
     time_t rawTime;
     struct tm timeInfo;
     char timeBuffer[80];

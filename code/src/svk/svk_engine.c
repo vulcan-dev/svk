@@ -168,6 +168,8 @@ svkEngine* svkEngine_Create(const char* appName, const u32 appVersion)
     svkEngine* svke = SVK_ZMSTRUCT(svkEngine, 1);
     svke->swapChain = SVK_ZMSTRUCT(struct _svkEngineSwapChain, 1);
     svke->scene = SVK_ZMSTRUCT(struct _svkEngineScene, 1);
+//    svke->core.vertexBuffers = svkVector_Create(0, sizeof(VkBuffer));
+//    svke->core.indexBuffers = svkVector_Create(0, sizeof(VkBuffer));
 
     svke->info = (struct _svkEngineInfo){
         appVersion,
@@ -408,6 +410,16 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     if (result != VK_SUCCESS)
         return result;
 
+    // Create time query pool
+    VkQueryPoolCreateInfo poolCreateInfo = SVK_ZMSTRUCT2(VkQueryPoolCreateInfo);
+    poolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    poolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    poolCreateInfo.queryCount = 4;
+
+    result = vkCreateQueryPool(svke->core.device, &poolCreateInfo, VK_NULL_HANDLE, &svke->core.timeQueryPool);
+    if (result != VK_SUCCESS)
+        return result;
+
     // Finish up
     svke->core.renderer.clearColor = (VkClearValue){{{ 0.11f, 0.13f, 0.18f, 1.0f }}};
 
@@ -440,11 +452,18 @@ void svkEngine_Destroy(svkEngine* svke)
 
     CleanupSwapChain(svke->core.device, svke->swapChain);
 
-    vkDestroyBuffer(svke->core.device, svke->core.vertexBuffer, VK_NULL_HANDLE);
-    vkFreeMemory(svke->core.device, svke->core.vertexBufferMemory, VK_NULL_HANDLE);
+    for (size_t i = 0; i < svke->scene->drawables->size; i++)
+    {
+        svkDrawable* drawable = (svkDrawable*)svke->scene->drawables->data[i];
+        vkDestroyBuffer(svke->core.device, drawable->buffers.vertexBuffer, VK_NULL_HANDLE);
+        vkFreeMemory(svke->core.device, drawable->buffers.vertexMemory, VK_NULL_HANDLE);
 
-    vkDestroyBuffer(svke->core.device, svke->core.indexBuffer, VK_NULL_HANDLE);
-    vkFreeMemory(svke->core.device, svke->core.indexBufferMemory, VK_NULL_HANDLE);
+        if (drawable->buffers.indexBuffer)
+        {
+            vkDestroyBuffer(svke->core.device, drawable->buffers.indexBuffer, VK_NULL_HANDLE);
+            vkFreeMemory(svke->core.device, drawable->buffers.indexMemory, VK_NULL_HANDLE);
+        }
+    }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -453,6 +472,7 @@ void svkEngine_Destroy(svkEngine* svke)
         vkDestroyFence(svke->core.device, svke->core.renderer.inFlightFences[i], VK_NULL_HANDLE);
     }
 
+    vkDestroyQueryPool(svke->core.device, svke->core.timeQueryPool, VK_NULL_HANDLE);
     vkDestroyCommandPool(svke->core.device, svke->core.commandPool, VK_NULL_HANDLE);
     vkDestroyPipeline(svke->core.device, svke->core.graphicsPipeline, VK_NULL_HANDLE);
     vkDestroyPipelineLayout(svke->core.device, svke->core.pipelineLayout, VK_NULL_HANDLE);
@@ -461,8 +481,8 @@ void svkEngine_Destroy(svkEngine* svke)
     for (size_t i = 0; i < svke->core.shaders->size; i++)
         vkDestroyShaderModule(svke->core.device, ((svkShader*)svke->core.shaders->data[i])->shader, VK_NULL_HANDLE);
 
-    vkDestroyDevice(svke->core.device, VK_NULL_HANDLE);
     vkDestroySurfaceKHR(svke->core.instance, svke->core.surface, VK_NULL_HANDLE);
+    vkDestroyDevice(svke->core.device, VK_NULL_HANDLE);
 
     if (VALIDATION_LAYER_ENABLED)
         DestroyDebugUtilsMessengerEXT(svke->core.instance, svke->debugMessenger, VK_NULL_HANDLE);
@@ -479,7 +499,7 @@ void svkEngine_Destroy(svkEngine* svke)
     svkVector_Free(svke->swapChain->imageViews);
 
     for (size_t i = 0; i < svke->scene->drawables->size; i++)
-        SVK_FREE(svke->scene->drawables->data[i]);
+        SVK_FREE(svke->scene->drawables->data[i]);  
 
     svkVector_Free(svke->scene->drawables);
 

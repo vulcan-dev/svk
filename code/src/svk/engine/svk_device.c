@@ -4,7 +4,8 @@
 #include "svk_swapchain.c"
 
 local const char* deviceExtensions[] = {
-    "VK_KHR_swapchain"
+    "VK_KHR_swapchain",
+    "VK_EXT_host_query_reset"
 };
 
 internal bool CheckDeviceExtensionSupport(VkPhysicalDevice physicalDevice)
@@ -127,6 +128,11 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
         queueCreateInfos[i] = queueCreateInfo;
     }
 
+    VkPhysicalDeviceHostQueryResetFeatures resetFeatures;
+    resetFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+    resetFeatures.pNext = NULL;
+    resetFeatures.hostQueryReset = VK_TRUE;
+
     VkPhysicalDeviceFeatures deviceFeatures = SVK_ZMSTRUCT2(VkPhysicalDeviceFeatures);
     VkDeviceCreateInfo createInfo = SVK_ZMSTRUCT2(VkDeviceCreateInfo);
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -135,6 +141,7 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = SVK_ARRAY_SIZE(deviceExtensions);
     createInfo.ppEnabledExtensionNames = deviceExtensions;
+    createInfo.pNext = &resetFeatures;
 
     if (enableValidationLayer)
     {
