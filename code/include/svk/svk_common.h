@@ -4,16 +4,13 @@
 #include <string.h> // for memset
 #include <assert.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "svk/util/svk_assert.h"
 
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 typedef unsigned long long u64;
-
-typedef unsigned char bool;
-#define true 1
-#define false 0
 
 #define internal static
 #define persist  static

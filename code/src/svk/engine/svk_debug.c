@@ -8,7 +8,7 @@ __DebugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
     void* pUserData) {
 
-    SVK_LogDebug("(VL) -> %s", callbackData->pMessage);
+    SVK_LogDebug("[VL] %s", callbackData->pMessage);
 
     return VK_FALSE;
 }

@@ -2,12 +2,11 @@
 #include "svk/engine/svk_command.h"
 #include <Windows.h>
 
-local uint32_t currentFrame = 0;
-
 internal void FetchRenderTimeResults(
     const VkDevice device,
     struct _svkEngineDebug* debug,
     const VkPhysicalDevice physicalDevice,
+    const uint32_t currentFrame,
     VkQueryPool timeQueryPool)
 {
     uint64_t buffer[2];
@@ -27,58 +26,48 @@ internal void FetchRenderTimeResults(
     debug->gpuTime = (buffer[1] - buffer[0]) * timestampPeriod * 1e-6f;
 }
 
-VkResult _svkEngine_DrawFrame(
-    SDL_Window* window,
-    const VkPhysicalDevice physicalDevice,
-    const VkSurfaceKHR surface,
-    const VkDevice device,
-    const VkCommandPool commandPool,
-    VkQueryPool timeQueryPool,
-    const SVKARRAY_TYPE(VkCommandBuffer) commandBuffers,
-    const SVKVECTOR_TYPE(svkDrawable) drawables,
-    const VkPipeline graphicsPipeline,
-    const VkRenderPass renderPass,
-    struct _svkEngineSwapChain* swapChain,
-    struct _svkEngineCoreQueue queue,
-    struct _svkEngineDebug* debug,
-    struct _svkEngineRenderer* renderer)
+VkResult _svkEngine_DrawFrame(SDL_Window* window, svkEngine* engine)
 {
-    FetchRenderTimeResults(device, debug, physicalDevice, timeQueryPool);
+    struct _svkEngineCore* core = &engine->core;
+    struct _svkEngineSwapChain* swapChain = engine->swapChain;
+    struct _svkEngineRenderer* renderer = &core->renderer;
 
-    SVK_CHECK_VKRESULT(vkQueueWaitIdle(queue.graphics), "Failed to wait idle");
-    SVK_CHECK_VKRESULT(vkWaitForFences(device, 1, &renderer->inFlightFences[currentFrame], VK_TRUE, UINT64_MAX), "Failed to wait for fence");
+    FetchRenderTimeResults(core->device, &engine->debug, core->physicalDevice, core->currentFrame, core->timeQueryPool);
+
+    SVK_CHECK_VKRESULT(vkQueueWaitIdle(core->queues.graphics), "Failed to wait idle");
+    SVK_CHECK_VKRESULT(vkWaitForFences(core->device, 1, &renderer->inFlightFences[core->currentFrame], VK_TRUE, UINT64_MAX), "Failed to wait for fence");
 
     uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapChain->swapChain, UINT64_MAX, renderer->imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(core->device, swapChain->swapChain, UINT64_MAX, renderer->imageAvailableSemaphores[core->currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
     {
-        svkEngine_RecreateSwapChain(swapChain, device, physicalDevice, renderPass, surface, window);
+        svkEngine_RecreateSwapChain(swapChain, core->device, core->physicalDevice, core->renderPass, core->surface, window);
         return result;
     }
 
-    SVK_CHECK_VKRESULT(vkResetFences(device, 1, &renderer->inFlightFences[currentFrame]), "Failed to reset fence");
+    SVK_CHECK_VKRESULT(vkResetFences(core->device, 1, &renderer->inFlightFences[core->currentFrame]), "Failed to reset fence");
 
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    _svkEngine_RecordCommandBuffer(device, commandBuffers[currentFrame], imageIndex, renderPass, renderer->clearColor, timeQueryPool, currentFrame, swapChain->frameBuffers, drawables, swapChain->extent, graphicsPipeline);
+    vkResetCommandBuffer(core->commandBuffers[core->currentFrame], 0);
+    _svkEngine_RecordCommandBuffer(engine, imageIndex);
 
-    VkSemaphore signalSemaphores[] = { renderer->renderFinishedSemaphores[currentFrame] };
+    VkSemaphore signalSemaphores[] = { renderer->renderFinishedSemaphores[core->currentFrame] };
     {
         VkSubmitInfo submitInfo = SVK_ZMSTRUCT2(VkSubmitInfo);
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-        VkSemaphore waitSemaphores[] = { renderer->imageAvailableSemaphores[currentFrame] };
+        VkSemaphore waitSemaphores[] = { renderer->imageAvailableSemaphores[core->currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
 
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+        submitInfo.pCommandBuffers = &core->commandBuffers[core->currentFrame];
 
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        SVK_CHECK_VKRESULT(vkQueueSubmit(queue.graphics, 1, &submitInfo, renderer->inFlightFences[currentFrame]), "Failed to submit");
+        SVK_CHECK_VKRESULT(vkQueueSubmit(core->queues.graphics, 1, &submitInfo, renderer->inFlightFences[core->currentFrame]), "Failed to submit");
     }
 
     // Presentation
@@ -94,13 +83,15 @@ VkResult _svkEngine_DrawFrame(
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = NULL;
 
-    result = vkQueuePresentKHR(queue.present, &presentInfo);
+    result = vkQueuePresentKHR(core->queues.present, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
     {
-        svkEngine_RecreateSwapChain(swapChain, device, physicalDevice, renderPass, surface, window);
+        svkEngine_RecreateSwapChain(swapChain, core->device, core->physicalDevice, core->renderPass, core->surface, window);
         return result;
     }
 
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    core->currentFrame = (core->currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+    svkScene_PostRender(engine);
     return VK_SUCCESS;
 }

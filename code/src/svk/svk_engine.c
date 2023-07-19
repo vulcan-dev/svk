@@ -1,14 +1,13 @@
 #include "svk/svk_engine.h"
 #include "svk/util/svk_vector.h"
 #include "svk/engine/svk_command.h"
+#include "svk/engine/svk_descriptor.h"
 
 #include "engine/svk_device.c"
 #include "engine/svk_debug.c"
 #include "engine/svk_render.c"
 
 #include <SDL2/SDL_vulkan.h>
-#include <cpuid.h>
-#include <Windows.h>
 
 #define VALIDATION_LAYER_ENABLED true // TODO: Make it a variable
 
@@ -16,7 +15,7 @@ local const char* validationLayers[1] = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-SvkResult lastErrorCode = SVK_SUCCESS; // svk_engine.h
+SvkResult lastErrorCode = SVK_SUCCESS; // TODO: Remove
 SvkResult SVK_GetLastError() {
     return lastErrorCode;
 }
@@ -150,7 +149,9 @@ svkQueueFamilyIndices _svkEngine_FindQueueFamilies(
     return indices;
 }
 
-internal void CleanupSwapChain(const VkDevice device, struct _svkEngineSwapChain* swapchain)
+internal void CleanupSwapChain(
+    const VkDevice device,
+    struct _svkEngineSwapChain* swapchain)
 {
     for (size_t i = 0; i < swapchain->frameBuffers->size; i++)
         vkDestroyFramebuffer(device, swapchain->frameBuffers->data[i], VK_NULL_HANDLE);
@@ -310,27 +311,9 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
                 VK_VERSION_MINOR(deviceProperties.apiVersion),
                 VK_VERSION_PATCH(deviceProperties.apiVersion));
 
-    unsigned int eax, ebx, ecx, edx;
-    char vendor[13] = {0};
-    char brand[49] = {0};
-
-    // Retrieve vendor string
-    __cpuid(0, eax, ebx, ecx, edx);
-    memcpy(vendor, &ebx, 4);
-    memcpy(vendor + 4, &edx, 4);
-    memcpy(vendor + 8, &ecx, 4);
-
-    // Retrieve brand string
-    for (int i = 0x80000002; i <= 0x80000004; ++i) {
-        __cpuid(i, eax, ebx, ecx, edx);
-        memcpy(brand + (i - 0x80000002) * 16, &eax, 4);
-        memcpy(brand + (i - 0x80000002) * 16 + 4, &ebx, 4);
-        memcpy(brand + (i - 0x80000002) * 16 + 8, &ecx, 4);
-        memcpy(brand + (i - 0x80000002) * 16 + 12, &edx, 4);
-    }
-
-    SVK_LogInfo("CPU Vendor: %s", vendor);
-    SVK_LogInfo("CPU Brand: %s", brand);
+    svkCPUInfo info = svkGetSystemCPUInfo();
+    SVK_LogInfo("CPU Vendor: %s", info.vendor);
+    SVK_LogInfo("CPU Brand: %s", info.brand);
 
     // Create logical device
     result = CreateLogicalDevice(svke->core.physicalDevice, &svke->core.device, &svke->core.queues, svke->core.surface, VALIDATION_LAYER_ENABLED, validationLayers);
@@ -360,6 +343,11 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     if (result != VK_SUCCESS)
         return result;
 
+    // Create descriptor layout
+    result = _svkEngine_CreateDescriptorLayout(svke->core.device, &svke->core.descriptorSetLayout);
+    if (result != VK_SUCCESS)
+        return result;
+
     // Setup shaders for pipeline
     svke->core.shaders = svkVector_Create(2, sizeof(svkShader));
     svkShader* coreVertexShader = svkShader_CreateFromFile(svke->core.device, "rom/shaders/compiled/vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -379,6 +367,7 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
         svke->core.shaders,
         svke->swapChain->extent,
         svke->core.renderPass,
+        svke->core.descriptorSetLayout,
         &svke->core.graphicsPipeline,
         &svke->core.pipelineLayout);
     if (result != VK_SUCCESS)
@@ -399,6 +388,11 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
 
     // TEMP
     svke->scene->drawables = svkVector_Create(1, sizeof(svkDrawable)); // TODO: Do this somewhere else & implement `svkVector_Resize`
+
+    // Create descriptor pool
+    result = _svkEngine_CreateDescriptorPool(svke->core.device, &svke->core.descriptorPool);
+    if (result != VK_SUCCESS)
+        return result;
 
     // Create command buffer
     result = _svkEngine_CreateCommandBuffers(svke->core.device, svke->core.commandPool, &svke->core.commandBuffers);
@@ -452,18 +446,10 @@ void svkEngine_Destroy(svkEngine* svke)
 
     CleanupSwapChain(svke->core.device, svke->swapChain);
 
-    for (size_t i = 0; i < svke->scene->drawables->size; i++)
-    {
-        svkDrawable* drawable = (svkDrawable*)svke->scene->drawables->data[i];
-        vkDestroyBuffer(svke->core.device, drawable->buffers.vertexBuffer, VK_NULL_HANDLE);
-        vkFreeMemory(svke->core.device, drawable->buffers.vertexMemory, VK_NULL_HANDLE);
+    vkDestroyDescriptorPool(svke->core.device, svke->core.descriptorPool, VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(svke->core.device, svke->core.descriptorSetLayout, VK_NULL_HANDLE);
 
-        if (drawable->buffers.indexBuffer)
-        {
-            vkDestroyBuffer(svke->core.device, drawable->buffers.indexBuffer, VK_NULL_HANDLE);
-            vkFreeMemory(svke->core.device, drawable->buffers.indexMemory, VK_NULL_HANDLE);
-        }
-    }
+    svkScene_Destroy(&svke->core, svke->scene);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -498,12 +484,6 @@ void svkEngine_Destroy(svkEngine* svke)
     svkVector_Free(svke->swapChain->images);
     svkVector_Free(svke->swapChain->imageViews);
 
-    for (size_t i = 0; i < svke->scene->drawables->size; i++)
-        SVK_FREE(svke->scene->drawables->data[i]);  
-
-    svkVector_Free(svke->scene->drawables);
-
-    SVK_FREE(svke->scene);
     SVK_FREE(svke->swapChain);
     SVK_FREE(svke);
 }

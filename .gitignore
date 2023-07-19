@@ -3,7 +3,11 @@
 build/*
 rom/shaders/compiled
 deps/sdl2/*
+deps/cglm/*
+deps/tinycthread/*
 *.jpg
 
 !deps/sdl2/.gitkeep
+!deps/cglm/.gitkeep
+!deps/tinycthread/.gitkeep
 !build/.gitkeep

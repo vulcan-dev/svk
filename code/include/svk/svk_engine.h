@@ -7,6 +7,8 @@
 #include "svk/util/svk_vector.h"
 #include "svk/svk.h"
 
+#include "cglm/cglm.h"
+
 #define MAX_FRAMES_IN_FLIGHT 2
 
 /* Notes:
@@ -81,34 +83,49 @@ struct _svkEngineCore
     struct _svkEngineCoreQueue queues;
     struct _svkEngineRenderer renderer;
 
-    SVKVECTOR_TYPE(svkShader) shaders;
+    SVKVECTOR_TYPE(svkShader) shaders; // TODO: Move into renderer
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;
 
     VkSurfaceKHR surface;
     VkPipeline graphicsPipeline;
+    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
-    VkCommandPool commandPool;
 
+    uint32_t currentFrame;
+
+    VkCommandPool commandPool;
     VkQueryPool timeQueryPool;
+    VkDescriptorPool descriptorPool;
 
     SVKARRAY_TYPE(VkCommandBuffer) commandBuffers;
 };
+
+typedef struct _svkEngineDrawableBuffers
+{
+    VkBuffer vertexBuffer;
+    VkBuffer indexBuffer;
+    SVKARRAY_TYPE(VkBuffer) uniformBuffers;
+    VkDeviceMemory vertexMemory;
+    VkDeviceMemory indexMemory;
+    SVKARRAY_TYPE(VkDeviceMemory) uniformBuffersMemory;
+
+    SVKARRAY_TYPE(void*) mappedBuffers;
+} _svkEngineDrawableBuffers;
 
 // Public Structures
 //------------------------------------------------------------------------
 typedef struct svkWindow svkWindow;
 typedef struct SDL_Window SDL_Window;
 
-typedef struct _svkEngineDrawableData
+typedef struct svkUniformBufferObj
 {
-    VkBuffer vertexBuffer;
-    VkBuffer indexBuffer;
-    VkDeviceMemory vertexMemory;
-    VkDeviceMemory indexMemory;
-} _svkEngineDrawableData;
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} svkUniformBufferObj;
 
 typedef struct svkQueueFamilyIndices
 {
@@ -126,12 +143,13 @@ typedef struct svkDrawable
 {
     SVKVECTOR_TYPE(svkVertex) vertices;
     SVKVECTOR_TYPE(uint16_t) indices;
-    _svkEngineDrawableData buffers;
+    _svkEngineDrawableBuffers* buffers;
+    SVKARRAY_TYPE(VkDescriptorSet) descriptorSets;
 } svkDrawable;
 
 typedef struct svkCamera
 {
-
+    
 } svkCamera;
 
 typedef struct svkEngine
@@ -171,6 +189,8 @@ svkDrawable* svkDrawable_Create(
 svkQueueFamilyIndices _svkEngine_FindQueueFamilies(
     const VkPhysicalDevice physicalDevice,
     const VkSurfaceKHR surface);
+
+
 
 VkResult _svkEngine_Initialize(
     svkEngine*  svke,

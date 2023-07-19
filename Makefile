@@ -1,14 +1,17 @@
 # VULKAN_ROOT (1.3.250.1)
 VULKAN_ROOT = F:/SDK/Vulkan/1.3.250.1
 
+LIB_DIRS := -Ldeps/sdl2/lib -Ldeps/cglm/lib -L$(VULKAN_ROOT)/Lib
+INC_DIRS := -Ideps/sdl2/include -Ideps/cglm/include -I$(VULKAN_ROOT)/Include -Icode/include
+
 SVK_SOURCES := $(wildcard code/src/svk/*.c)
 SVK_ENGINE_SOURCES := $(wildcard code/src/svk/engine/*.c)
 SVK_ENGINE_UTIL_SOURCES := $(wildcard code/src/svk/util/*.c)
 SRC := $(SVK_SOURCES) $(SVK_ENGINE_SOURCES) $(SVK_ENGINE_UTIL_SOURCES) code/src/main.c
 
 CC = clang
-CFLAGS = -std=c11 -g -fsanitize=address -fno-omit-frame-pointer -Wno-void-pointer-to-int-cast -Ideps/sdl2/include -I$(VULKAN_ROOT)/Include -Icode/include -luser32
-LDFLAGS = -Ldeps/sdl2/lib -L$(VULKAN_ROOT)/Lib -lSDL2main -lSDL2 -lvulkan-1
+CFLAGS = -std=c11 -g -fsanitize=address -fno-omit-frame-pointer -Wno-void-pointer-to-int-cast $(INC_DIRS) -luser32
+LDFLAGS = $(LIB_DIRS) -lSDL2main -lSDL2 -lvulkan-1
 TARGET = build/svk.exe
 
 all: $(TARGET)

@@ -20,7 +20,7 @@ typedef struct svkVec3
 //------------------------------------------------------------------------
 typedef struct svkVertex
 {
-    svkVec2 pos;
+    svkVec3 pos;
     svkVec3 color;
 } svkVertex;
 

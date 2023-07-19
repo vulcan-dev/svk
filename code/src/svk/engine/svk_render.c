@@ -52,6 +52,7 @@ internal VkResult CreateGraphicsPipeline(
     const SVKVECTOR_TYPE(svkShader) shaders,
     const VkExtent2D swapChainExtent,
     const VkRenderPass renderPass,
+    const VkDescriptorSetLayout descriptorSetLayout,
     VkPipeline* outPipeline,
     VkPipelineLayout* outPipelineLayout)
 {
@@ -99,9 +100,9 @@ internal VkResult CreateGraphicsPipeline(
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_TRUE;
 
     // Multisampling
     VkPipelineMultisampleStateCreateInfo multisampling = SVK_ZMSTRUCT2(VkPipelineMultisampleStateCreateInfo);
@@ -130,6 +131,10 @@ internal VkResult CreateGraphicsPipeline(
     // Pipeline Layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = SVK_ZMSTRUCT2(VkPipelineLayoutCreateInfo);
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+    // TODO: Take a look at "Push Constants", I think they're best for static drawables.
 
     VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, outPipelineLayout);
     if (result != VK_SUCCESS)

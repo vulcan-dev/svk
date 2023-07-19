@@ -188,3 +188,30 @@ VkResult _svkEngine_CreateIndexBuffer(
 
     return VK_SUCCESS;
 }
+
+VkResult _svkEngine_CreateUniformBuffers(
+    const VkPhysicalDevice physicalDevice,
+    VkDevice* device,
+    SVKARRAY_TYPE(VkBuffer)* outBuffers,
+    SVKARRAY_TYPE(VkDeviceMemory)* outMemory,
+    SVKARRAY_TYPE(void**) outMappedBuffers)
+{
+    VkDeviceSize size = sizeof(svkUniformBufferObj);
+    *outBuffers = SVK_MALLOC(sizeof(VkBuffer) * MAX_FRAMES_IN_FLIGHT);
+    *outMemory = SVK_MALLOC(sizeof(VkDeviceMemory) * MAX_FRAMES_IN_FLIGHT);
+    *outMappedBuffers = SVK_MALLOC(sizeof(void*) * MAX_FRAMES_IN_FLIGHT);
+
+    VkResult result = VK_SUCCESS;
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        result = CreateBuffer(device, physicalDevice, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &((*outBuffers)[i]), &((*outMemory)[i]));
+        if (result != VK_SUCCESS)
+            return result;
+
+        result = vkMapMemory(*device, (*outMemory)[i], 0, size, 0, &((*outMappedBuffers)[i]));
+        if (result != VK_SUCCESS)
+            return result;
+    }
+
+    return VK_SUCCESS;
+}

@@ -15,7 +15,7 @@ SVKARRAY_TYPE(VkVertexInputAttributeDescription) svkVertex_GetAttribDescriptions
 
     descs[0].binding = 0;
     descs[0].location = 0;
-    descs[0].format = VK_FORMAT_R32G32_SFLOAT;
+    descs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     descs[0].offset = offsetof(svkVertex, pos);
 
     descs[1].binding = 0;

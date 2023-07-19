@@ -45,21 +45,7 @@ bool svkWindow_Update(svkWindow* svkw, SDL_Event* event)
 
     svkEngine* svke = svkw->engine;
 
-    _svkEngine_DrawFrame(
-        svkw->window,
-        svke->core.physicalDevice,
-        svke->core.surface,
-        svke->core.device,
-        svke->core.commandPool,
-        svke->core.timeQueryPool,
-        svke->core.commandBuffers,
-        svke->scene->drawables,
-        svke->core.graphicsPipeline,
-        svke->core.renderPass,
-        svke->swapChain,
-        svke->core.queues,
-        &svke->debug,
-        &svke->core.renderer);
+    _svkEngine_DrawFrame(svkw->window, svke);
 
     char newTitle[256];
     sprintf_s(newTitle, 256, "%s (RenderTime: %fms)", svkw->title, svke->debug.gpuTime);
