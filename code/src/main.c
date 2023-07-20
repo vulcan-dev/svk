@@ -58,32 +58,38 @@ const uint16_t rectIndices[6] = { 0, 1, 2, 2, 3, 0 };
 
 int main(void)
 {
-    svkEngine* svke = svkEngine_Create("SVK Engine", VK_MAKE_API_VERSION(0, 1, 0, 0));
-    svkWindow* svkw = svkWindow_Create(svke, "Vulkan Engine",
+    svkEngine* engine = svkEngine_Create("SVK Engine", VK_MAKE_API_VERSION(0, 1, 0, 0));
+    svkWindow* window = svkWindow_Create(engine, "Vulkan Engine",
         (svkVec2){ SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED },
         (svkVec2){ 800, 600 },
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN
     );
 
-    if (svkw == NULL)
+    if (window == NULL)
     {
         printf("Something went wrong! Last Error: %#012x\n", SVK_GetLastError());
-        svkWindow_Destroy(svkw);
-        svkEngine_Destroy(svke);
+        svkWindow_Destroy(window);
+        svkEngine_Destroy(engine);
         return -1;
     }
 
-    srand((unsigned int)time(NULL));
+    svkScene_Initialize(engine);
 
-    SDL_ShowWindow(svkw->window);
+    SDL_ShowWindow(window->window);
     
     // Init Scene
-    svkDrawable* cube = svkDrawable_Create(cubeVertices, 8, cubeIndices, 36);
-    svkScene_AddDrawable(svke, cube);
+    svkDrawable* cube0 = svkDrawable_Create(cubeVertices, 8, cubeIndices, 36);
+    svkScene_AddDrawable(engine, cube0);
+
+//    svkDrawable* tri = svkDrawable_Create(triangleVertices, 3, NULL, 0);
+//    svkScene_AddDrawable(engine, tri);
 
     // Update
     svkEvent event;
-    while (svkWindow_Update(svkw, &event))
+
+    svkCamera* camera = engine->scene->camera;
+
+    while (svkWindow_Update(window, &event))
     {
         float currentTime = (float)clock() / CLOCKS_PER_SEC;
 
@@ -91,13 +97,13 @@ int main(void)
         float rotationAngle = rotationSpeed * currentTime;
         vec3 rotation = { rotationAngle, rotationAngle, rotationAngle };
 
-        const uint32_t frame = svke->core.currentFrame;
+        const uint32_t frame = engine->core.currentFrame;
 
-        svkScene_RotateObject(cube, rotation, frame);
+        svkScene_RotateObject(cube0, rotation, frame);
     }
 
-    svkWindow_Destroy(svkw);
-    svkEngine_Destroy(svke);
+    svkWindow_Destroy(window);
+    svkEngine_Destroy(engine);
 
     return 0;
 }

@@ -16,6 +16,10 @@ typedef unsigned long long u64;
 #define persist  static
 #define local    static
 
+#define VEC3_UP (vec3){0.0f, 0.0f, 1.0f}
+#define VEC3_FRONT (vec3){0.0f, -1.0f, 0.0f}
+#define VEC3_RIGHT (vec3){1.0f, 0.0f, 0.0f}
+
 #define SVK_FREE(x) free(x)
 #define SVK_MALLOC(size) malloc(size)
 #define SVK_REALLOC(block, size) realloc(block, size)

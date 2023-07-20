@@ -1,8 +1,11 @@
-// DONE: (Minor) In DrawFrame and RecordCommandBuffer, take in `svkEngine*`.
-// DONE: (Major) Instead of drawing all the objects in the RecordCommandBuffer function, create a function
+// DONE: In DrawFrame and RecordCommandBuffer, take in `svkEngine*`.
+// DONE: Instead of drawing all the objects in the RecordCommandBuffer function, create a function
 //               here and have it call it, so: "svkScene_Render(svke)". We can then figure out what to batch render
 //               and have it be cleaner to look at. We also need to reset the model identity after each call.
+// DONE: Implement depth buffering, shouldn't be too difficult.
+// DONE: Finish implementing the camera structure, if we resize then the new view will be handled in "svkScene_Render".
 
-// TODO: (Major) Implement depth buffering, shouldn't be too difficult.
-// TODO: (Major) Finish implementing the camera structure, if we resize then the new view will be handled in "svkScene_Render".
-// TODO: (Major) Meshing and batched rendering. Right now, I'm just iterating through the drawables and issuing a `vkCmdDraw` for each of them.
+// TODO: Dynamic Rendering
+// TODO: Meshing and batched rendering. Right now, I'm just iterating through the drawables and issuing a `vkCmdDraw` for each of them.
+// TODO: Move camera systems to its own class
+// TODO: Input manager

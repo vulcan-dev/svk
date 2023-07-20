@@ -1,9 +1,61 @@
+#include "svk/engine/svk_math.h"
 #include "svk/engine/svk_scene.h"
 #include "svk/engine/svk_buffer.h"
 #include "svk/engine/svk_descriptor.h"
 #include "svk/svk_engine.h"
 
-#define VEC3_UP (vec3){0.0f, 0.0f, 1.0f}
+void svkScene_Initialize(svkEngine* engine)
+{
+    _svkEngineScene* scene = engine->scene;
+    scene->drawables = svkVector_Create(0, sizeof(svkDrawable));
+
+    scene->camera = SVK_ZMSTRUCT(svkCamera, 1);
+    svkCamera* camera = scene->camera;
+    camera->firstMouse = true;
+    camera->mouseSensitivity = 0.05f;
+    camera->yaw = -90.0f;
+    camera->pitch = 0.0f;
+    camera->speed = 0.003f;
+    camera->nearClip = 0.1f;
+    camera->farClip = 100.0f;
+    camera->aspectRatio = (float)engine->swapChain->extent.width / (float)engine->swapChain->extent.height;
+    camera->pos[0] = 0.0f;
+    camera->pos[1] = 2.0f;
+    camera->pos[2] = 0.0f;
+}
+
+void svkScene_PostRender(svkEngine* engine)
+{
+    svkCamera* camera = engine->scene->camera;
+
+    vec3 front;
+    front[0] = cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
+    front[1] = sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
+    front[2] = sin(glm_rad(camera->pitch));
+    glm_normalize_to(front, front);
+
+    vec3 target;
+    glm_vec3_add(camera->pos, front, target);
+
+    glm_lookat(camera->pos, target, VEC3_UP, camera->view);
+
+    glm_perspective(glm_rad(90.0f), camera->aspectRatio, camera->nearClip, camera->farClip, camera->projection);
+    camera->projection[1][1] *= -1.0f;
+
+    for (size_t i = 0; i < engine->scene->drawables->size; i++)
+    {
+        svkDrawable* drawable = (svkDrawable*)engine->scene->drawables->data[i];
+
+        svkUniformBufferObj ubo;
+        memcpy(&ubo, drawable->buffers->mappedBuffers[engine->core.currentFrame], sizeof(ubo));
+
+        glm_mat4_identity(ubo.model);
+        memcpy(ubo.view, camera->view, sizeof(ubo.view));
+        memcpy(ubo.proj, camera->projection, sizeof(ubo.proj));
+
+        memcpy(drawable->buffers->mappedBuffers[engine->core.currentFrame], &ubo, sizeof(ubo));
+    }
+}
 
 void svkScene_RotateObject(
     svkDrawable* drawable,
@@ -30,47 +82,41 @@ void svkScene_MoveObject(
     svkUniformBufferObj ubo;
     memcpy(&ubo, drawable->buffers->mappedBuffers[frame], sizeof(ubo));
 
-    //glm_mat4_identity(ubo.model);
     glm_translate(ubo.model, position);
 
     memcpy(drawable->buffers->mappedBuffers[frame], &ubo, sizeof(ubo));
 }
 
-void svkScene_AddDrawable(svkEngine* svke, svkDrawable* drawable)
+void svkScene_AddDrawable(svkEngine* engine, svkDrawable* drawable)
 {
     drawable->buffers = SVK_ALLOCSTRUCT(_svkEngineDrawableBuffers, 1);
 
-    _svkEngine_CreateUniformBuffers(svke->core.physicalDevice, &svke->core.device, &drawable->buffers->uniformBuffers, &drawable->buffers->uniformBuffersMemory, &drawable->buffers->mappedBuffers);
-    _svkEngine_CreateDescriptorSets(svke->core.device, svke->core.descriptorSetLayout, svke->core.descriptorPool, drawable->buffers->uniformBuffers, &drawable->descriptorSets);
-
-    vec3 eye = (vec3){ 2.0f, 2.0f, 2.0f };
+    _svkEngine_CreateUniformBuffers(engine->core.physicalDevice, &engine->core.device, &drawable->buffers->uniformBuffers, &drawable->buffers->uniformBuffersMemory, &drawable->buffers->mappedBuffers);
+    _svkEngine_CreateDescriptorSets(engine->core.device, engine->core.descriptorSetLayout, engine->core.descriptorPool, drawable->buffers->uniformBuffers, &drawable->descriptorSets);
 
     svkUniformBufferObj ubo;
 
+    svkCamera* camera = engine->scene->camera;
+
     glm_mat4_identity(ubo.model);
     glm_rotate(ubo.model, 0, (vec3){0.0f, 0.0f, 1.0f});
-
-    glm_mat4_identity(ubo.view);
-    glm_lookat(eye, (vec3){0.0f, 0.0f, 0.0f}, VEC3_UP, ubo.view);
-
-    glm_mat4_identity(ubo.proj);
-    glm_perspective(glm_rad(45.0f), svke->swapChain->extent.width / svke->swapChain->extent.height, 0.1f, 10.0f, ubo.proj);
-    ubo.proj[1][1] *= -1.0f;
+    memcpy(ubo.view, camera->view, sizeof(ubo.view));
+    memcpy(ubo.proj, camera->projection, sizeof(ubo.proj));
 
     memcpy(drawable->buffers->mappedBuffers[0], &ubo, sizeof(ubo));
     memcpy(drawable->buffers->mappedBuffers[1], &ubo, sizeof(ubo));
 
     drawable->buffers->vertexBuffer = SVK_MALLOC(sizeof(VkBuffer));
 
-    SVK_ASSERT(svke->scene, "scene is NULL!");
+    SVK_ASSERT(engine->scene, "scene is NULL!");
     if (_svkEngine_CreateVertexBuffer(
-        svke->core.physicalDevice,
+        engine->core.physicalDevice,
         drawable->vertices,
-        &svke->core.device,
+        &engine->core.device,
         &drawable->buffers->vertexMemory,
         &drawable->buffers->vertexBuffer,
-        &svke->core.commandPool,
-        &svke->core.queues.graphics) != VK_SUCCESS)
+        &engine->core.commandPool,
+        &engine->core.queues.graphics) != VK_SUCCESS)
     {
         fprintf(stderr, "_svkEngine_CreateVertexBuffer failed!\n");
         return;
@@ -80,26 +126,26 @@ void svkScene_AddDrawable(svkEngine* svke, svkDrawable* drawable)
 
     if (drawable->indices->size == 0)
     {
-        svkVector_PushBack(svke->scene->drawables, (void*)drawable);
+        svkVector_PushBack(engine->scene->drawables, (void*)drawable);
         return;
     }
 
     drawable->buffers->indexBuffer = SVK_MALLOC(sizeof(VkBuffer));
 
     if (_svkEngine_CreateIndexBuffer(
-        svke->core.physicalDevice,
+        engine->core.physicalDevice,
         drawable->indices,
-        &svke->core.device,
+        &engine->core.device,
         &drawable->buffers->indexMemory,
         &drawable->buffers->indexBuffer,
-        &svke->core.commandPool,
-        &svke->core.queues.graphics) != VK_SUCCESS)
+        &engine->core.commandPool,
+        &engine->core.queues.graphics) != VK_SUCCESS)
     {
         fprintf(stderr, "_svkEngine_CreateIndexBuffer failed!\n");
         return;
     }
 
-    svkVector_PushBack(svke->scene->drawables, (void*)drawable);
+    svkVector_PushBack(engine->scene->drawables, (void*)drawable);
 }
 
 void svkScene_Destroy(struct _svkEngineCore* core, struct _svkEngineScene* scene)
@@ -112,6 +158,9 @@ void svkScene_Destroy(struct _svkEngineCore* core, struct _svkEngineScene* scene
         SVK_FREE(scene);
         return;
     }
+
+    if (scene->camera)
+        SVK_FREE(scene->camera);
 
     for (size_t i = 0; i < scene->drawables->size; i++)
     {
@@ -150,19 +199,6 @@ void svkScene_Destroy(struct _svkEngineCore* core, struct _svkEngineScene* scene
     svkVector_Free(scene->drawables);
 
     SVK_FREE(scene);
-}
-
-void svkScene_PostRender(svkEngine* engine)
-{
-    for (size_t i = 0; i < engine->scene->drawables->size; i++)
-    {
-        svkDrawable* drawable = (svkDrawable*)engine->scene->drawables->data[i];
-
-        svkUniformBufferObj ubo;
-        memcpy(&ubo, drawable->buffers->mappedBuffers[engine->core.currentFrame], sizeof(ubo));
-        glm_mat4_identity(ubo.model);
-        memcpy(drawable->buffers->mappedBuffers[engine->core.currentFrame], &ubo, sizeof(ubo));
-    }
 }
 
 void svkScene_Render(svkEngine* engine, VkCommandBuffer commandBuffer)

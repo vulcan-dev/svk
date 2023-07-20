@@ -2,6 +2,7 @@
 #define SVK_ENGINE_H
 
 #include <vulkan/vulkan.h>
+#include <stdalign.h>
 
 #include "svk/engine/svk_shader.h"
 #include "svk/util/svk_vector.h"
@@ -130,9 +131,9 @@ typedef struct SDL_Window SDL_Window;
 
 typedef struct svkUniformBufferObj
 {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
+    alignas(16) mat4 model;
+    alignas(16) mat4 view;
+    alignas(16) mat4 proj;
 } svkUniformBufferObj;
 
 typedef struct svkQueueFamilyIndices
@@ -157,7 +158,25 @@ typedef struct svkDrawable
 
 typedef struct svkCamera
 {
-    
+    vec3 pos;
+
+    float yaw;
+    float pitch;
+    float speed;
+    float mouseSensitivity;
+
+    float lastMouseX;
+    float lastMouseY;
+    bool firstMouse;
+    bool mouseLocked;
+
+    float nearClip;
+    float farClip;
+
+    float aspectRatio;
+
+    alignas(16) mat4 view;
+    alignas(16) mat4 projection;
 } svkCamera;
 
 typedef struct svkEngine
@@ -193,8 +212,6 @@ svkDrawable* svkDrawable_Create(
 svkQueueFamilyIndices _svkEngine_FindQueueFamilies(
     const VkPhysicalDevice physicalDevice,
     const VkSurfaceKHR surface);
-
-
 
 VkResult _svkEngine_Initialize(
     svkEngine*  svke,

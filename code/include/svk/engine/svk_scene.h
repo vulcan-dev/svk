@@ -19,6 +19,7 @@ void svkScene_MoveObject(
     vec3 position,
     const uint32_t frame);
 
+void svkScene_Initialize(svkEngine* engine);
 void svkScene_Destroy(_svkEngineCore* core, _svkEngineScene* scene);
 void svkScene_PostRender(svkEngine* engine);
 void svkScene_Render(svkEngine* engine, VkCommandBuffer commandBuffer);

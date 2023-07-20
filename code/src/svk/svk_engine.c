@@ -475,9 +475,6 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
         svke->core.depth.imageView,
         &svke->swapChain->frameBuffers);
 
-    // TEMP
-    svke->scene->drawables = svkVector_Create(1, sizeof(svkDrawable)); // TODO: Do this somewhere else & implement `svkVector_Resize`
-
     // Create descriptor pool
     result = _svkEngine_CreateDescriptorPool(svke->core.device, &svke->core.descriptorPool);
     if (result != VK_SUCCESS)
