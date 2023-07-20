@@ -2,23 +2,6 @@
 
 // Internal Functions
 //------------------------------------------------------------------------
-internal uint32_t FindMemoryType(
-    const VkPhysicalDevice physicalDevice,
-    const uint32_t typeFilter,
-    const VkMemoryPropertyFlags properties)
-{
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-    {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-            return i;
-    }
-
-    return 0;
-}
-
 internal VkResult CreateBuffer(
     VkDevice* device,
     const VkPhysicalDevice physicalDevice,
@@ -45,7 +28,7 @@ internal VkResult CreateBuffer(
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.pNext = VK_NULL_HANDLE;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = _svkEngine_FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     result = vkAllocateMemory(*device, &allocInfo, VK_NULL_HANDLE, outMemory);
     if (result != VK_SUCCESS)

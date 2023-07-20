@@ -104,6 +104,15 @@ void svkScene_AddDrawable(svkEngine* svke, svkDrawable* drawable)
 
 void svkScene_Destroy(struct _svkEngineCore* core, struct _svkEngineScene* scene)
 {
+    if (!scene)
+        return;
+
+    if (!scene->drawables)
+    {
+        SVK_FREE(scene);
+        return;
+    }
+
     for (size_t i = 0; i < scene->drawables->size; i++)
     {
         svkDrawable* drawable = (svkDrawable*)scene->drawables->data[i];

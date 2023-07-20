@@ -17,6 +17,8 @@
 #include "svk/util/svk_system.h"
 
 #include "svk/engine/svk_vertex.h"
+#include "svk/engine/svk_memory.h"
+#include "svk/engine/svk_image.h"
 #include "svk/engine/svk_buffer.h"
 #include "svk/engine/svk_shader.h"
 #include "svk/engine/svk_scene.h"

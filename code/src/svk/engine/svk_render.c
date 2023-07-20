@@ -110,6 +110,17 @@ internal VkResult CreateGraphicsPipeline(
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+    // Depth Stencil
+    VkPipelineDepthStencilStateCreateInfo depthStencil = SVK_ZMSTRUCT2(VkPipelineDepthStencilStateCreateInfo);
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f;
+    depthStencil.maxDepthBounds = 1.0f;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
     // Color Blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment = SVK_ZMSTRUCT2(VkPipelineColorBlendAttachmentState);
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -166,6 +177,7 @@ internal VkResult CreateGraphicsPipeline(
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = *outPipelineLayout;
     pipelineInfo.renderPass = renderPass;
@@ -183,6 +195,7 @@ internal VkResult CreateGraphicsPipeline(
 
 internal VkResult CreateRenderPass(
     const VkDevice device,
+    const VkPhysicalDevice physicalDevice,
     const VkFormat swapChainImageFormat,
     VkRenderPass* outRenderPass)
 {
@@ -197,6 +210,28 @@ internal VkResult CreateRenderPass(
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+    // Depth Buffer
+    VkFormat depthFormat = _svkEngine_FindDepthFormat(physicalDevice);
+    if (depthFormat == VK_FORMAT_UNDEFINED)
+    {
+        SVK_LogError("Unable to find depth format for device");
+        return VK_ERROR_UNKNOWN;
+    }
+
+    VkAttachmentDescription depthAttachment = SVK_ZMSTRUCT2(VkAttachmentDescription);
+    depthAttachment.format = depthFormat;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = SVK_ZMSTRUCT2(VkAttachmentReference);
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     // Subpasses and Attachment References
     VkAttachmentReference colorAttachmentRef = SVK_ZMSTRUCT2(VkAttachmentReference);
     colorAttachmentRef.attachment = 0;
@@ -206,21 +241,24 @@ internal VkResult CreateRenderPass(
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1;
     subpassDescription.pColorAttachments = &colorAttachmentRef;
+    subpassDescription.pDepthStencilAttachment = &depthAttachmentRef;
 
     // Subpass Dependencies
     VkSubpassDependency dependency = SVK_ZMSTRUCT2(VkSubpassDependency);
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     // Render Pass
+    VkAttachmentDescription attachments[2] = { colorAttachment, depthAttachment };
+
     VkRenderPassCreateInfo renderPassInfo = SVK_ZMSTRUCT2(VkRenderPassCreateInfo);
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = SVK_ARRAY_SIZE(attachments);
+    renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpassDescription;
     renderPassInfo.dependencyCount = 1;
@@ -234,6 +272,7 @@ internal VkResult CreateFrameBuffers(
     const VkRenderPass renderPass,
     const VkExtent2D swapChainExtent,
     const SVKVECTOR_TYPE(VkImageView) swapChainImageViews,
+    const VkImageView depthImageView,
     SVKVECTOR_TYPE(VkFramebuffer)* outSwapChainBuffers)
 {
     VkResult result = VK_SUCCESS;
@@ -244,13 +283,14 @@ internal VkResult CreateFrameBuffers(
     for (size_t i = 0; i < swapChainImageViews->size; i++)
     {
         VkImageView attachments[] = {
-            (VkImageView)swapChainImageViews->data[i]
+            (VkImageView)swapChainImageViews->data[i],
+            depthImageView,
         };
 
         VkFramebufferCreateInfo frameBufferInfo = SVK_ZMSTRUCT2(VkFramebufferCreateInfo);
         frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         frameBufferInfo.renderPass = renderPass;
-        frameBufferInfo.attachmentCount = 1;
+        frameBufferInfo.attachmentCount = SVK_ARRAY_SIZE(attachments);
         frameBufferInfo.pAttachments = attachments;
         frameBufferInfo.width = swapChainExtent.width;
         frameBufferInfo.height = swapChainExtent.height;

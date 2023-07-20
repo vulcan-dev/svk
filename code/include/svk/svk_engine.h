@@ -76,12 +76,20 @@ struct _svkEngineDebug
     float gpuTime;
 };
 
+struct _svkEngineDepth
+{
+    VkImage image;
+    VkDeviceMemory imageMemory;
+    VkImageView imageView;
+};
+
 struct _svkEngineCore
 {
     VkInstance instance;
 
     struct _svkEngineCoreQueue queues;
     struct _svkEngineRenderer renderer;
+    struct _svkEngineDepth depth;
 
     SVKVECTOR_TYPE(svkShader) shaders; // TODO: Move into renderer
 
@@ -169,14 +177,10 @@ svkEngine* svkEngine_Create(
     const char* appName,
     const u32   appVersion);
 
+VkFormat _svkEngine_FindDepthFormat(const VkPhysicalDevice physicalDevice);
+
 void svkEngine_Destroy(svkEngine* svke);
-VkResult svkEngine_RecreateSwapChain(
-    struct _svkEngineSwapChain* swapChain,
-    const VkDevice device,
-    const VkPhysicalDevice physicalDevice,
-    const VkRenderPass renderPass,
-    const VkSurfaceKHR surface,
-    SDL_Window* window);
+VkResult svkEngine_RecreateSwapChain(svkEngine* engine, SDL_Window* window);
 
 svkDrawable* svkDrawable_Create(
     const svkVertex* vertices,

@@ -60,8 +60,13 @@ VkResult _svkEngine_RecordCommandBuffer(svkEngine* engine, const uint32_t imageI
         renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
         renderPassInfo.renderArea.extent = swapChain->extent;
 
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &core->renderer.clearColor;
+        VkClearValue depthClearValue = SVK_ZMSTRUCT2(VkClearValue);
+        depthClearValue.depthStencil = (VkClearDepthStencilValue){ 1.0f, 0 };
+
+        VkClearValue clearValues[2] = { core->renderer.clearColor, depthClearValue };
+
+        renderPassInfo.clearValueCount = SVK_ARRAY_SIZE(clearValues);
+        renderPassInfo.pClearValues = clearValues;
 
         // Begin Render Pass
         vkCmdResetQueryPool(commandBuffer, core->timeQueryPool, core->currentFrame * 2, 2);

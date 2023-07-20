@@ -41,7 +41,7 @@ VkResult _svkEngine_DrawFrame(SDL_Window* window, svkEngine* engine)
     VkResult result = vkAcquireNextImageKHR(core->device, swapChain->swapChain, UINT64_MAX, renderer->imageAvailableSemaphores[core->currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
     {
-        svkEngine_RecreateSwapChain(swapChain, core->device, core->physicalDevice, core->renderPass, core->surface, window);
+        svkEngine_RecreateSwapChain(engine, window);
         return result;
     }
 
@@ -86,7 +86,7 @@ VkResult _svkEngine_DrawFrame(SDL_Window* window, svkEngine* engine)
     result = vkQueuePresentKHR(core->queues.present, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
     {
-        svkEngine_RecreateSwapChain(swapChain, core->device, core->physicalDevice, core->renderPass, core->surface, window);
+        svkEngine_RecreateSwapChain(engine, window);
         return result;
     }
 
