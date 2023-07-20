@@ -32,7 +32,7 @@ VkResult _svkEngine_DrawFrame(SDL_Window* window, svkEngine* engine)
     struct _svkEngineSwapChain* swapChain = engine->swapChain;
     struct _svkEngineRenderer* renderer = &core->renderer;
 
-    //FetchRenderTimeResults(core->device, &engine->debug, core->physicalDevice, core->currentFrame, core->timeQueryPool);
+    FetchRenderTimeResults(core->device, &engine->debug, core->physicalDevice, core->currentFrame, core->timeQueryPool);
 
     SVK_CHECK_VKRESULT(vkQueueWaitIdle(core->queues.graphics), "Failed to wait idle");
     SVK_CHECK_VKRESULT(vkWaitForFences(core->device, 1, &renderer->inFlightFences[core->currentFrame], VK_TRUE, UINT64_MAX), "Failed to wait for fence");

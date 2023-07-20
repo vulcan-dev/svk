@@ -130,6 +130,8 @@ VkResult _svkEngine_RecordCommandBuffer(svkEngine* engine, const uint32_t imageI
     // Start Rendering
     VkImageMemoryBarrier imageMemoryBarrier = SVK_ZMSTRUCT2(VkImageMemoryBarrier);
     VkRenderingInfoKHR renderInfo = PreRender(imageIndex, engine, commandBuffer, &imageMemoryBarrier);
+    vkCmdResetQueryPool(commandBuffer, core->timeQueryPool, core->currentFrame * 2, 2);
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2);
     vkCmdBeginRenderingKHR(commandBuffer, &renderInfo);
 
     // Bind and Render
@@ -171,6 +173,6 @@ VkResult _svkEngine_RecordCommandBuffer(svkEngine* engine, const uint32_t imageI
         1,
         &imageMemoryBarrier);
 
-    //vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2 + 1);
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2 + 1);
     return vkEndCommandBuffer(commandBuffer);
 }
