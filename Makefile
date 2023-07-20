@@ -10,7 +10,7 @@ SVK_ENGINE_UTIL_SOURCES := $(wildcard code/src/svk/util/*.c)
 SRC := $(SVK_SOURCES) $(SVK_ENGINE_SOURCES) $(SVK_ENGINE_UTIL_SOURCES) code/src/main.c
 
 CC = clang
-CFLAGS = -std=c11 -g -fsanitize=address -fno-omit-frame-pointer -Wno-void-pointer-to-int-cast $(INC_DIRS) -luser32
+CFLAGS = -std=c11 -g -O0 -fsanitize=address -fno-omit-frame-pointer -Wno-void-pointer-to-int-cast $(INC_DIRS) -luser32
 LDFLAGS = $(LIB_DIRS) -lSDL2main -lSDL2 -lvulkan-1
 TARGET = build/svk.exe
 

@@ -5,6 +5,9 @@
 
 local const char* deviceExtensions[] = {
     "VK_KHR_swapchain",
+    "VK_KHR_dynamic_rendering",
+    "VK_KHR_create_renderpass2",
+    "VK_KHR_depth_stencil_resolve",
     "VK_EXT_host_query_reset"
 };
 
@@ -133,6 +136,11 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
     resetFeatures.pNext = NULL;
     resetFeatures.hostQueryReset = VK_TRUE;
 
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures = SVK_ZMSTRUCT2(VkPhysicalDeviceDynamicRenderingFeaturesKHR);
+    dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+    dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+    dynamicRenderingFeatures.pNext = &resetFeatures;
+
     VkPhysicalDeviceFeatures deviceFeatures = SVK_ZMSTRUCT2(VkPhysicalDeviceFeatures);
     VkDeviceCreateInfo createInfo = SVK_ZMSTRUCT2(VkDeviceCreateInfo);
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -141,7 +149,7 @@ internal VkResult CreateLogicalDevice(VkPhysicalDevice physicalDevice, VkDevice*
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = SVK_ARRAY_SIZE(deviceExtensions);
     createInfo.ppEnabledExtensionNames = deviceExtensions;
-    createInfo.pNext = &resetFeatures;
+    createInfo.pNext = &dynamicRenderingFeatures;
 
     if (enableValidationLayer)
     {

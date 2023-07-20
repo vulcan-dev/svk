@@ -1,11 +1,86 @@
 #include "svk/svk_engine.h"
 
+// Internal Functions
+//------------------------------------------------------------------------
+internal VkRenderingInfoKHR PreRender(uint32_t imageIndex, svkEngine* engine, VkCommandBuffer commandBuffer, VkImageMemoryBarrier* imageMemoryBarrier)
+{
+    struct _svkEngineCore* core = &engine->core;
+    struct _svkEngineSwapChain* swapChain = engine->swapChain;
+
+    VkClearValue depthClearValue = SVK_ZMSTRUCT2(VkClearValue);
+    depthClearValue.depthStencil = (VkClearDepthStencilValue){ 1.0f, 0 };
+
+    // Color Attachment Info
+    static VkRenderingAttachmentInfoKHR colorAttachmentInfo = SVK_ZMSTRUCT2(VkRenderingAttachmentInfoKHR);
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    colorAttachmentInfo.imageView = (VkImageView)swapChain->imageViews->data[imageIndex];
+    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentInfo.clearValue = core->renderer.clearColor;
+
+    // Depth
+    static VkRenderingAttachmentInfoKHR depthStencilAttachment = SVK_ZMSTRUCT2(VkRenderingAttachmentInfoKHR);
+    depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    depthStencilAttachment.imageView = core->depth.imageView;
+    depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depthStencilAttachment.clearValue = depthClearValue;
+
+    // Render Info
+    VkRenderingInfoKHR renderInfo = SVK_ZMSTRUCT2(VkRenderingInfoKHR);
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    renderInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
+    renderInfo.renderArea.extent = swapChain->extent;
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &colorAttachmentInfo;
+    renderInfo.pDepthAttachment = &depthStencilAttachment;
+
+    // Subresource Range
+    static VkImageSubresourceRange imageSubresourceRange = SVK_ZMSTRUCT2(VkImageSubresourceRange);
+    imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageSubresourceRange.baseMipLevel = 0;
+    imageSubresourceRange.levelCount = 1;
+    imageSubresourceRange.baseArrayLayer = 0;
+    imageSubresourceRange.layerCount = 1;
+
+    // Image Barrier
+    imageMemoryBarrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier->srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    imageMemoryBarrier->dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    imageMemoryBarrier->oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarrier->newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imageMemoryBarrier->image = (VkImage)swapChain->images->data[imageIndex];
+    imageMemoryBarrier->subresourceRange = imageSubresourceRange;
+    imageMemoryBarrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0,
+        0,
+        NULL,
+        0,
+        NULL,
+        1,
+        imageMemoryBarrier);
+
+    return renderInfo;
+}
+
+// Functions
+//------------------------------------------------------------------------
 VkResult _svkEngine_CreateCommandPool(
     const VkDevice device,
     const VkPhysicalDevice physicalDevice,
     const VkSurfaceKHR surface,
     VkCommandPool* outCommandPool)
 {
+
     svkQueueFamilyIndices queueFamilyIndices = _svkEngine_FindQueueFamilies(physicalDevice, surface);
 
     VkCommandPoolCreateInfo poolInfo;
@@ -46,34 +121,16 @@ VkResult _svkEngine_RecordCommandBuffer(svkEngine* engine, const uint32_t imageI
     beginInfo.pInheritanceInfo = NULL;
 
     VkCommandBuffer commandBuffer = core->commandBuffers[core->currentFrame];
-    VkResult result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    if (result != VK_SUCCESS)
-        return result;
+    SVK_CHECK_VKRESULT(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer failed!");
 
-    // Starting the Render Pass
-    {
-        VkRenderPassBeginInfo renderPassInfo;
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.pNext = VK_NULL_HANDLE;
-        renderPassInfo.renderPass = core->renderPass;
-        renderPassInfo.framebuffer = (VkFramebuffer)swapChain->frameBuffers->data[imageIndex];
-        renderPassInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
-        renderPassInfo.renderArea.extent = swapChain->extent;
+    // TODO: Move these.
+    PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(core->device, "vkCmdBeginRenderingKHR");
+    PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(core->device, "vkCmdEndRenderingKHR");
 
-        VkClearValue depthClearValue = SVK_ZMSTRUCT2(VkClearValue);
-        depthClearValue.depthStencil = (VkClearDepthStencilValue){ 1.0f, 0 };
-
-        VkClearValue clearValues[2] = { core->renderer.clearColor, depthClearValue };
-
-        renderPassInfo.clearValueCount = SVK_ARRAY_SIZE(clearValues);
-        renderPassInfo.pClearValues = clearValues;
-
-        // Begin Render Pass
-        vkCmdResetQueryPool(commandBuffer, core->timeQueryPool, core->currentFrame * 2, 2);
-        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2);
-
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    }
+    // Start Rendering
+    VkImageMemoryBarrier imageMemoryBarrier = SVK_ZMSTRUCT2(VkImageMemoryBarrier);
+    VkRenderingInfoKHR renderInfo = PreRender(imageIndex, engine, commandBuffer, &imageMemoryBarrier);
+    vkCmdBeginRenderingKHR(commandBuffer, &renderInfo);
 
     // Bind and Render
     {
@@ -97,7 +154,23 @@ VkResult _svkEngine_RecordCommandBuffer(svkEngine* engine, const uint32_t imageI
     }
 
     // End
-    vkCmdEndRenderPass(commandBuffer);
-    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2 + 1);
+    vkCmdEndRenderingKHR(commandBuffer);
+
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        0,
+        0,
+        NULL,
+        0,
+        NULL,
+        1,
+        &imageMemoryBarrier);
+
+    //vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, core->timeQueryPool, core->currentFrame * 2 + 1);
     return vkEndCommandBuffer(commandBuffer);
 }

@@ -158,9 +158,6 @@ internal void CleanupSwapChain(
     vkDestroyImage(svke->core.device, svke->core.depth.image, VK_NULL_HANDLE);
     vkFreeMemory(svke->core.device, svke->core.depth.imageMemory, VK_NULL_HANDLE);
 
-    for (size_t i = 0; i < swapchain->frameBuffers->size; i++)
-        vkDestroyFramebuffer(device, swapchain->frameBuffers->data[i], VK_NULL_HANDLE);
-
     for (size_t i = 0; i < swapchain->imageViews->size; i++)
         vkDestroyImageView(device, swapchain->imageViews->data[i], VK_NULL_HANDLE);
 
@@ -287,15 +284,15 @@ VkResult svkEngine_RecreateSwapChain(svkEngine* engine, SDL_Window* window)
     if (result != VK_SUCCESS)
         return result;
 
-    result = CreateFrameBuffers(
-        engine->core.device,
-        engine->core.renderPass,
-        engine->swapChain->extent,
-        engine->swapChain->imageViews,
-        engine->core.depth.imageView,
-        &engine->swapChain->frameBuffers);
-    if (result != VK_SUCCESS)
-        return result;
+//    result = CreateFrameBuffers(
+//        engine->core.device,
+//        engine->core.renderPass,
+//        engine->swapChain->extent,
+//        engine->swapChain->imageViews,
+//        engine->core.depth.imageView,
+//        &engine->swapChain->frameBuffers);
+//    if (result != VK_SUCCESS)
+//        return result;
 
     return VK_SUCCESS;
 }
@@ -417,9 +414,9 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
         return result;
     
     // Create render pass
-    result = CreateRenderPass(svke->core.device, svke->core.physicalDevice, svke->swapChain->imageFormat, &svke->core.renderPass);
-    if (result != VK_SUCCESS)
-        return result;
+//    result = CreateRenderPass(svke->core.device, svke->core.physicalDevice, svke->swapChain->imageFormat, &svke->core.renderPass);
+//    if (result != VK_SUCCESS)
+//        return result;
 
     // Create descriptor layout
     result = _svkEngine_CreateDescriptorLayout(svke->core.device, &svke->core.descriptorSetLayout);
@@ -442,6 +439,8 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     // Create graphics pipeline
     result = CreateGraphicsPipeline(
         svke->core.device,
+        svke->core.physicalDevice,
+        svke->swapChain->imageFormat,
         svke->core.shaders,
         svke->swapChain->extent,
         svke->core.renderPass,
@@ -467,13 +466,13 @@ VkResult _svkEngine_Initialize(svkEngine* svke, SDL_Window* window)
     }
 
     // Create framebuffers
-    CreateFrameBuffers(
-        svke->core.device,
-        svke->core.renderPass,
-        svke->swapChain->extent,
-        svke->swapChain->imageViews,
-        svke->core.depth.imageView,
-        &svke->swapChain->frameBuffers);
+//    CreateFrameBuffers(
+//        svke->core.device,
+//        svke->core.renderPass,
+//        svke->swapChain->extent,
+//        svke->swapChain->imageViews,
+//        svke->core.depth.imageView,
+//        &svke->swapChain->frameBuffers);
 
     // Create descriptor pool
     result = _svkEngine_CreateDescriptorPool(svke->core.device, &svke->core.descriptorPool);

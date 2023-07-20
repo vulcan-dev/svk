@@ -49,6 +49,8 @@ internal VkResult CreateImageViews(
 
 internal VkResult CreateGraphicsPipeline(
     const VkDevice device,
+    const VkPhysicalDevice physicalDevice,
+    VkFormat imageFormat,
     const SVKVECTOR_TYPE(svkShader) shaders,
     const VkExtent2D swapChainExtent,
     const VkRenderPass renderPass,
@@ -162,6 +164,20 @@ internal VkResult CreateGraphicsPipeline(
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
+    // Rendering Info
+    VkFormat depthFormat = _svkEngine_FindDepthFormat(physicalDevice);
+    if (depthFormat == VK_FORMAT_UNDEFINED)
+    {
+        SVK_LogError("Unable to find depth format for device");
+        return VK_ERROR_UNKNOWN;
+    }
+
+    VkPipelineRenderingCreateInfoKHR renderingCreateInfo = SVK_ZMSTRUCT2(VkPipelineRenderingCreateInfoKHR);
+    renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+    renderingCreateInfo.depthAttachmentFormat = depthFormat;
+    renderingCreateInfo.colorAttachmentCount = 1;
+    renderingCreateInfo.pColorAttachmentFormats = &imageFormat;
+
     // Pipeline Info
     VkPipelineShaderStageCreateInfo* shaderStages = SVK_ZMSTRUCT(VkPipelineShaderStageCreateInfo, shaders->size);
     for (size_t i = 0; i < shaders->size; i++)
@@ -169,6 +185,7 @@ internal VkResult CreateGraphicsPipeline(
 
     VkGraphicsPipelineCreateInfo pipelineInfo = SVK_ZMSTRUCT2(VkGraphicsPipelineCreateInfo);
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingCreateInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -180,7 +197,7 @@ internal VkResult CreateGraphicsPipeline(
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = *outPipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
