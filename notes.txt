@@ -13,3 +13,5 @@
 // DONE: Input manager
 
 // TODO: Meshing and batched rendering. Right now, I'm just iterating through the drawables and issuing a `vkCmdDraw` for each of them.
+// TODO: Textures
+// TODO: Skybox

@@ -21,6 +21,7 @@
 #include "svk/engine/svk_shader.h"
 #include "svk/engine/svk_scene.h"
 
+#include "svk/svk_primitives.h"
 #include "svk/svk_types.h"
 #include "svk/svk_common.h"
 #include "svk/svk_engine.h"
