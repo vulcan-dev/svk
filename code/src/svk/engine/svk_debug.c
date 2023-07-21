@@ -46,3 +46,54 @@ internal VkResult SetupDebugMessenger(VkInstance* instance, VkDebugUtilsMessenge
 
     return CreateDebugUtilsMessengerEXT(*instance, &createInfo, NULL, debugMessenger);
 }
+
+internal VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData) {
+
+    if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+    {
+        SVK_LogDebug("[Vulkan - %s] %s", messageType, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+    }
+    else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+    {
+        SVK_LogInfo("[Vulkan - %s] %s", pCallbackData->pMessageIdName, pCallbackData->pMessage);
+    }
+    else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+    {
+        SVK_LogWarn("[Vulkan - %s] %s", pCallbackData->pMessageIdName, pCallbackData->pMessage);
+    }
+    else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+    {
+        SVK_LogError("[Vulkan - %s] %s", pCallbackData->pMessageIdName, pCallbackData->pMessage);
+    }
+
+    return VK_FALSE;
+}
+
+static VkDebugUtilsMessengerEXT callback;
+internal VkResult SetupDebugCallback(VkInstance instance)
+{
+    PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+
+    VkDebugUtilsMessengerCreateInfoEXT createInfo = SVK_ZMSTRUCT2(VkDebugUtilsMessengerCreateInfoEXT);
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+    createInfo.pfnUserCallback = DebugCallback;
+
+    return vkCreateDebugUtilsMessengerEXT(instance, &createInfo, VK_NULL_HANDLE, &callback);
+}
+
+internal void DestroyDebugCallback(VkInstance instance)
+{
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+
+    vkDestroyDebugUtilsMessengerEXT(instance, callback, VK_NULL_HANDLE);
+}

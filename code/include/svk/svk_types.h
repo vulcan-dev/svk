@@ -9,6 +9,12 @@ typedef struct svkVec2
     float y;
 } svkVec2;
 
+typedef struct svkVec2i
+{
+    int x;
+    int y;
+} svkVec2i;
+
 typedef struct svkVec3
 {
     float x;

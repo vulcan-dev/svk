@@ -1,39 +1,83 @@
 #include "svk/svk_window.h"
 #include "svk/engine/svk_renderer.h"
+#include "svk/util/svk_logger.h"
 
-// Internal Function Prototypes
+// Internal Function
 //------------------------------------------------------------------------
-internal void _svkWindow_HandleEvents(svkWindow* svkw, SDL_Event event);
-internal void ProcessInput(svkEngine* engine);
+internal void _svkWindow_HandleEvents(svkWindow* window, SDL_Event event);
+
+void SDL_LogCallback(void *userdata, int category, SDL_LogPriority priority, const char *message)
+{
+    char msgInfo[10];
+    sprintf_s(msgInfo, 10, "[SDL (%d)]", category);
+
+    switch (priority)
+    {
+        case SDL_LOG_PRIORITY_DEBUG:
+            SVK_LogDebug("%s: %s", msgInfo, message);
+            break;
+        case SDL_LOG_PRIORITY_INFO:
+            SVK_LogInfo("%s: %s", msgInfo, message);
+            break;
+        case SDL_LOG_PRIORITY_WARN:
+            SVK_LogWarn("%s: %s", msgInfo, message);
+            break;
+        case SDL_LOG_PRIORITY_ERROR:
+            SVK_LogError("%s: %s", msgInfo, message);
+            break;
+        default:
+            break;
+    }
+}
 
 // SVKWindow Functions
 //------------------------------------------------------------------------
-svkWindow* svkWindow_Create(svkEngine* svke, const char* title, svkVec2 size, svkVec2 position, u32 flags)
+svkWindow* svkWindow_Create(svkEngine* engine, const char* title, svkVec2 size, svkVec2 position, u32 flags)
 {
     SVK_LogInfo("Creating window...");
-    svkWindow* svkw = SVK_ZMSTRUCT(svkWindow, 1);
-    svkw->title = title;
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
+    SDL_LogSetOutputFunction(SDL_LogCallback, NULL);
 
-    svkw->window = SDL_CreateWindow(title, size.x, size.y, position.x, position.y, flags);
-    if (!svkw->window)
+    svkWindow* window = SVK_ZMSTRUCT(svkWindow, 1);
+    window->title = title;
+    window->size = size;
+    window->inputManager = SVK_ZMSTRUCT2(svkInputManager);
+
+    window->window = SDL_CreateWindow(title, size.x, size.y, position.x, position.y, flags);
+    if (!window->window)
     {
         lastErrorCode = SVK_ERROR_CREATE_WINDOW;
         return NULL;
     }
 
-    svkw->engine = svke;
+    window->engine = engine;
 
-    const VkResult result = _svkEngine_Initialize(svke, svkw->window);
+    const VkResult result = _svkEngine_Initialize(engine, window->window);
     if (result != VK_SUCCESS)
     {
         fprintf(stderr, "Failed to initialize, error code: %d\n", result);
         return NULL;
     }
 
-    return svkw;
+    return window;
 }
 
-void svkWindow_SetCallback(svkWindow* svkw, u32 callbackType, void* cbfn, void* userData)
+void svkWindow_Destroy(svkWindow* window)
+{
+    SVK_LogInfo("Destroying window");
+
+    if (!window)
+        return;
+
+    vkDeviceWaitIdle(window->engine->core.device);
+
+    SDL_DestroyWindow(window->window);
+    SDL_Quit();
+
+    SVK_FREE(window);
+}
+
+void svkWindow_SetCallback(svkWindow* window, u32 callbackType, void* cbfn, void* userData)
 {}
 
 bool svkWindow_Update(svkWindow* window, SDL_Event* event)
@@ -42,38 +86,24 @@ bool svkWindow_Update(svkWindow* window, SDL_Event* event)
         return false;
 
     while (SDL_PollEvent(event))
-        _svkWindow_HandleEvents(window, *event);
+    {
+        if (!svkInput_Process(&window->inputManager, *event))
+            _svkWindow_HandleEvents(window, *event);
+    }
 
     svkEngine* engine = window->engine;
 
-    ProcessInput(engine);
-    _svkEngine_DrawFrame(window->window, engine);
+    if ((window->size.x > 0 && window->size.y > 0) && !(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED))
+        _svkEngine_DrawFrame(window->window, engine);
 
     char newTitle[256];
-    sprintf_s(newTitle, 256, "%s (RenderTime: %fms)", window->title, engine->debug.gpuTime);
+    sprintf_s(newTitle, 256, "%s (GPUTime: %fms)", window->title, engine->debug.gpuTime);
     SDL_SetWindowTitle(window->window, newTitle);
 
     return true;
 }
 
-void svkWindow_Destroy(svkWindow* svkw)
-{
-    SVK_LogInfo("Destroying window");
-
-    if (!svkw)
-        return;
-
-    vkDeviceWaitIdle(svkw->engine->core.device);
-
-    SDL_DestroyWindow(svkw->window);
-    SDL_Quit();
-
-    SVK_FREE(svkw);
-}
-
-// Internal Functions
-//------------------------------------------------------------------------
-void LockMouse(SDL_Window* window, bool lock)
+void svkWindow_LockMouse(SDL_Window* window, const bool lock)
 {
     SDL_bool locked = lock ? SDL_TRUE : SDL_FALSE;
     SDL_ShowCursor(!locked);
@@ -82,14 +112,13 @@ void LockMouse(SDL_Window* window, bool lock)
     SDL_CaptureMouse(locked);
 }
 
-bool moveForward = false;
-bool moveBackward = false;
-bool moveLeft = false;
-bool moveRight = false; // TODO: Move flags and handle in a seperate camera file
-
-internal void _svkWindow_HandleResize(svkCamera* camera, int newWidth, int newHeight)
+// Internal Functions
+//------------------------------------------------------------------------
+internal void _svkWindow_HandleResize(svkWindow* window, svkCamera* camera, int newWidth, int newHeight)
 {
     camera->aspectRatio = (float)newWidth / (float)newHeight;
+    window->size.x = newWidth;
+    window->size.y = newHeight;
 }
 
 internal void _svkWindow_HandleEvents(svkWindow* window, SDL_Event event)
@@ -106,139 +135,8 @@ internal void _svkWindow_HandleEvents(svkWindow* window, SDL_Event event)
         case SDL_WINDOWEVENT:
         {
             if (event.window.event == SDL_WINDOWEVENT_RESIZED)
-            {
-                _svkWindow_HandleResize(camera, event.window.data1, event.window.data2);
-                break;
-            }
-        }
-        case SDL_MOUSEMOTION:
-        {
-            if (!camera->mouseLocked)
-                break;
-
-            if (camera->firstMouse)
-            {
-                camera->lastMouseX = event.motion.x;
-                camera->lastMouseY = event.motion.y;
-                camera->firstMouse = false;
-            }
-
-            const float sensitivity = camera->mouseSensitivity;
-
-            const float xOffset = event.motion.xrel * sensitivity;
-            const float yOffset = event.motion.yrel * sensitivity;
-
-            camera->yaw -= xOffset;
-            camera->pitch -= yOffset;
-
-            if (camera->pitch > 89.0f) camera->pitch = 89.0f;
-            if (camera->pitch < -89.0f) camera->pitch = -89.0f;
-
+                _svkWindow_HandleResize(window, camera, event.window.data1, event.window.data2);
             break;
         }
-        case SDL_KEYDOWN:
-        {
-            if (event.key.keysym.sym == SDLK_w)
-            {
-                moveForward = true;
-                break;
-            }
-            else if (event.key.keysym.sym == SDLK_s)
-            {
-                moveBackward = true;
-                break;
-            }
-
-            if (event.key.keysym.sym == SDLK_a)
-            {
-                moveLeft = true;
-                break;
-            }
-            else if (event.key.keysym.sym == SDLK_d)
-            {
-                moveRight = true;
-                break;
-            }
-
-            if (event.key.keysym.sym == SDLK_SPACE)
-            {
-                camera->mouseLocked = !camera->mouseLocked;
-                LockMouse(window->window, camera->mouseLocked);
-            }
-        }
-        case SDL_KEYUP:
-        {
-            if (event.key.keysym.sym == SDLK_w)
-            {
-                moveForward = false;
-                break;
-            }
-            else if (event.key.keysym.sym == SDLK_s)
-            {
-                moveBackward = false;
-                break;
-            }
-
-            if (event.key.keysym.sym == SDLK_a)
-            {
-                moveLeft = false;
-                break;
-            }
-            else if (event.key.keysym.sym == SDLK_d)
-            {
-                moveRight = false;
-                break;
-            }
-            break;
-        }
-    }
-}
-
-internal void ProcessInput(svkEngine* engine)
-{
-    svkCamera* camera = engine->scene->camera;
-
-    if (moveForward)
-    {
-        vec3 cameraFront;
-        cameraFront[0] = cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-        cameraFront[1] = sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-        cameraFront[2] = sin(glm_rad(camera->pitch));
-
-        glm_normalize_to(cameraFront, cameraFront);
-        glm_vec3_scale(cameraFront, camera->speed, cameraFront);
-        glm_vec3_add(camera->pos, cameraFront, camera->pos);
-    } else if (moveBackward)
-    {
-        vec3 cameraBackward;
-        cameraBackward[0] = -cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-        cameraBackward[1] = -sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-        cameraBackward[2] = -sin(glm_rad(camera->pitch));
-
-        glm_normalize_to(cameraBackward, cameraBackward);
-        glm_vec3_scale(cameraBackward, camera->speed, cameraBackward);
-        glm_vec3_add(camera->pos, cameraBackward, camera->pos);
-    }
-
-    if (moveLeft)
-    {
-        vec3 cameraRight;
-        cameraRight[0] = cos(glm_rad(camera->yaw) + glm_rad(90.0f));
-        cameraRight[1] = sin(glm_rad(camera->yaw) + glm_rad(90.0f));
-        cameraRight[2] = 0.0f;
-
-        glm_normalize_to(cameraRight, cameraRight);
-        glm_vec3_scale(cameraRight, camera->speed, cameraRight);
-        glm_vec3_add(camera->pos, cameraRight, camera->pos);
-    } else if (moveRight)
-    {
-        vec3 cameraRight;
-        cameraRight[0] = cos(glm_rad(camera->yaw) + glm_rad(90.0f));
-        cameraRight[1] = sin(glm_rad(camera->yaw) + glm_rad(90.0f));
-        cameraRight[2] = 0.0f;
-
-        glm_normalize_to(cameraRight, cameraRight);
-        glm_vec3_scale(cameraRight, camera->speed, cameraRight);
-        glm_vec3_sub(camera->pos, cameraRight, camera->pos);
     }
 }

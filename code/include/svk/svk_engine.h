@@ -2,12 +2,12 @@
 #define SVK_ENGINE_H
 
 #include <vulkan/vulkan.h>
-#include <stdalign.h>
 
 #include "svk/engine/svk_shader.h"
 #include "svk/util/svk_vector.h"
 #include "svk/svk.h"
 
+#include <stdalign.h>
 #include "cglm/cglm.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
@@ -53,7 +53,6 @@ struct _svkEngineSwapChain
     VkSwapchainKHR swapChain;
     SVKVECTOR_TYPE(VkImage) images;
     SVKVECTOR_TYPE(VkImageView) imageViews;
-    SVKVECTOR_TYPE(VkFramebuffer) frameBuffers;
     VkFormat imageFormat;
     VkExtent2D extent;
 };
@@ -101,7 +100,6 @@ struct _svkEngineCore
     VkPipeline graphicsPipeline;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
-    VkRenderPass renderPass;
 
     uint32_t currentFrame;
 
@@ -156,29 +154,6 @@ typedef struct svkDrawable
     SVKARRAY_TYPE(VkDescriptorSet) descriptorSets;
 } svkDrawable;
 
-typedef struct svkCamera
-{
-    vec3 pos;
-
-    float yaw;
-    float pitch;
-    float speed;
-    float mouseSensitivity;
-
-    float lastMouseX;
-    float lastMouseY;
-    bool firstMouse;
-    bool mouseLocked;
-
-    float nearClip;
-    float farClip;
-
-    float aspectRatio;
-
-    alignas(16) mat4 view;
-    alignas(16) mat4 projection;
-} svkCamera;
-
 typedef struct svkEngine
 {
     struct _svkEngineCore core;
@@ -198,7 +173,7 @@ svkEngine* svkEngine_Create(
 
 VkFormat _svkEngine_FindDepthFormat(const VkPhysicalDevice physicalDevice);
 
-void svkEngine_Destroy(svkEngine* svke);
+void svkEngine_Destroy(svkEngine* engine);
 VkResult svkEngine_RecreateSwapChain(svkEngine* engine, SDL_Window* window);
 
 svkDrawable* svkDrawable_Create(
@@ -214,7 +189,7 @@ svkQueueFamilyIndices _svkEngine_FindQueueFamilies(
     const VkSurfaceKHR surface);
 
 VkResult _svkEngine_Initialize(
-    svkEngine*  svke,
+    svkEngine*  engine,
     SDL_Window* window);
 
 #endif

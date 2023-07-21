@@ -73,7 +73,7 @@ int main(void)
         return -1;
     }
 
-    svkScene_Initialize(engine);
+    svkScene_Initialize(window, engine);
 
     SDL_ShowWindow(window->window);
     
@@ -81,8 +81,8 @@ int main(void)
     svkDrawable* cube0 = svkDrawable_Create(cubeVertices, 8, cubeIndices, 36);
     svkScene_AddDrawable(engine, cube0);
 
-//    svkDrawable* tri = svkDrawable_Create(triangleVertices, 3, NULL, 0);
-//    svkScene_AddDrawable(engine, tri);
+    svkDrawable* tri = svkDrawable_Create(triangleVertices, 3, NULL, 0);
+    //svkScene_AddDrawable(engine, tri);
 
     // Update
     svkEvent event;
@@ -91,6 +91,8 @@ int main(void)
 
     while (svkWindow_Update(window, &event))
     {
+        svkCamera_Update(camera, &window->inputManager, window->window);
+
         float currentTime = (float)clock() / CLOCKS_PER_SEC;
 
         float rotationSpeed = 35.0f;
@@ -100,6 +102,7 @@ int main(void)
         const uint32_t frame = engine->core.currentFrame;
 
         svkScene_RotateObject(cube0, rotation, frame);
+        svkInput_Update(&window->inputManager);
     }
 
     svkWindow_Destroy(window);

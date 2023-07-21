@@ -25,6 +25,7 @@ typedef unsigned long long u64;
 #define SVK_REALLOC(block, size) realloc(block, size)
 #define SVK_MEMSET(dest, val, size) memset(&dest, 0, size)
 #define SVK_ZM(dest, size) memset(&dest, 0, size)
+#define SVK_ZMPTR(dest, size) memset(dest, 0, size)
 #define SVK_ZMA(dest) SVK_ZM(dest, sizeof(dest))
 
 #define SVK_CHECK_VKRESULT(result, msg, ...) \

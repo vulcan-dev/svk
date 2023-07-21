@@ -12,8 +12,11 @@ typedef SDL_Event svkEvent;
 
 typedef struct svkWindow
 {
-    svkEngine* engine;
     SDL_Window* window;
+    svkVec2 size;
+
+    svkEngine* engine;
+    svkInputManager inputManager;
 
     const char* title;
     bool shouldClose;
@@ -29,15 +32,16 @@ svkWindow* svkWindow_Create(
     u32         flags);
 
 void svkWindow_SetCallback(
-    svkWindow*  svkw,
+    svkWindow*  window,
     u32         callbackType,
     void*       cbfn,
     void*       userData);
 
 bool svkWindow_Update(
-    svkWindow*  svkw,
+    svkWindow*  window,
     SDL_Event*  event);
 
-void svkWindow_Destroy(svkWindow* svkw);
+void svkWindow_LockMouse(SDL_Window* window, const bool lock);
+void svkWindow_Destroy(svkWindow* window);
 
 #endif

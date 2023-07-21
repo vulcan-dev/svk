@@ -7,7 +7,8 @@ INC_DIRS := -Ideps/sdl2/include -Ideps/cglm/include -I$(VULKAN_ROOT)/Include -Ic
 SVK_SOURCES := $(wildcard code/src/svk/*.c)
 SVK_ENGINE_SOURCES := $(wildcard code/src/svk/engine/*.c)
 SVK_ENGINE_UTIL_SOURCES := $(wildcard code/src/svk/util/*.c)
-SRC := $(SVK_SOURCES) $(SVK_ENGINE_SOURCES) $(SVK_ENGINE_UTIL_SOURCES) code/src/main.c
+SVK_ENGINE_CAMERA_SOURCES = $(wildcard code/src/svk/camera/*.c)
+    SRC := $(SVK_SOURCES) $(SVK_ENGINE_SOURCES) $(SVK_ENGINE_UTIL_SOURCES) $(SVK_ENGINE_CAMERA_SOURCES) code/src/main.c
 
 CC = clang
 CFLAGS = -std=c11 -g -O0 -fsanitize=address -fno-omit-frame-pointer -Wno-void-pointer-to-int-cast $(INC_DIRS) -luser32

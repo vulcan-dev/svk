@@ -53,7 +53,6 @@ internal VkResult CreateGraphicsPipeline(
     VkFormat imageFormat,
     const SVKVECTOR_TYPE(svkShader) shaders,
     const VkExtent2D swapChainExtent,
-    const VkRenderPass renderPass,
     const VkDescriptorSetLayout descriptorSetLayout,
     VkPipeline* outPipeline,
     VkPipelineLayout* outPipelineLayout)
@@ -204,127 +203,10 @@ internal VkResult CreateGraphicsPipeline(
 
     // Pipeline
     result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, outPipeline);
+    if (result != VK_SUCCESS)
+        return result;
     
     SVK_FREE(shaderStages);
     SVK_FREE(attributeDescriptions);
-    return result;
-}
-
-internal VkResult CreateRenderPass(
-    const VkDevice device,
-    const VkPhysicalDevice physicalDevice,
-    const VkFormat swapChainImageFormat,
-    VkRenderPass* outRenderPass)
-{
-    VkAttachmentDescription colorAttachment;
-    colorAttachment.flags = 0;
-    colorAttachment.format = swapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Depth Buffer
-    VkFormat depthFormat = _svkEngine_FindDepthFormat(physicalDevice);
-    if (depthFormat == VK_FORMAT_UNDEFINED)
-    {
-        SVK_LogError("Unable to find depth format for device");
-        return VK_ERROR_UNKNOWN;
-    }
-
-    VkAttachmentDescription depthAttachment = SVK_ZMSTRUCT2(VkAttachmentDescription);
-    depthAttachment.format = depthFormat;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef = SVK_ZMSTRUCT2(VkAttachmentReference);
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    // Subpasses and Attachment References
-    VkAttachmentReference colorAttachmentRef = SVK_ZMSTRUCT2(VkAttachmentReference);
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpassDescription = SVK_ZMSTRUCT2(VkSubpassDescription);
-    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpassDescription.colorAttachmentCount = 1;
-    subpassDescription.pColorAttachments = &colorAttachmentRef;
-    subpassDescription.pDepthStencilAttachment = &depthAttachmentRef;
-
-    // Subpass Dependencies
-    VkSubpassDependency dependency = SVK_ZMSTRUCT2(VkSubpassDependency);
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    // Render Pass
-    VkAttachmentDescription attachments[2] = { colorAttachment, depthAttachment };
-
-    VkRenderPassCreateInfo renderPassInfo = SVK_ZMSTRUCT2(VkRenderPassCreateInfo);
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = SVK_ARRAY_SIZE(attachments);
-    renderPassInfo.pAttachments = attachments;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpassDescription;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    return vkCreateRenderPass(device, &renderPassInfo, NULL, outRenderPass);
-}
-
-internal VkResult CreateFrameBuffers(
-    const VkDevice device,
-    const VkRenderPass renderPass,
-    const VkExtent2D swapChainExtent,
-    const SVKVECTOR_TYPE(VkImageView) swapChainImageViews,
-    const VkImageView depthImageView,
-    SVKVECTOR_TYPE(VkFramebuffer)* outSwapChainBuffers)
-{
-    VkResult result = VK_SUCCESS;
-
-    *outSwapChainBuffers = svkVector_Create(swapChainImageViews->size, sizeof(VkFramebuffer));
-    VkFramebuffer* tempFramebuffers = SVK_ALLOCSTRUCT(VkFramebuffer, swapChainImageViews->size);
-
-    for (size_t i = 0; i < swapChainImageViews->size; i++)
-    {
-        VkImageView attachments[] = {
-            (VkImageView)swapChainImageViews->data[i],
-            depthImageView,
-        };
-
-        VkFramebufferCreateInfo frameBufferInfo = SVK_ZMSTRUCT2(VkFramebufferCreateInfo);
-        frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        frameBufferInfo.renderPass = renderPass;
-        frameBufferInfo.attachmentCount = SVK_ARRAY_SIZE(attachments);
-        frameBufferInfo.pAttachments = attachments;
-        frameBufferInfo.width = swapChainExtent.width;
-        frameBufferInfo.height = swapChainExtent.height;
-        frameBufferInfo.layers = 1;
-
-        result = vkCreateFramebuffer(device, &frameBufferInfo, NULL, &tempFramebuffers[i]);
-        if (result != VK_SUCCESS)
-        {
-            SVK_FREE(tempFramebuffers);
-            return result;
-        }
-
-        // Copy to vector
-        memcpy(&(*outSwapChainBuffers)->data[i], &tempFramebuffers[i], sizeof(VkFramebuffer));
-        (*outSwapChainBuffers)->size++;
-    }
-
-    SVK_FREE(tempFramebuffers);
-    return result;
+    return VK_SUCCESS;
 }

@@ -4,7 +4,7 @@
 #include "svk/engine/svk_descriptor.h"
 #include "svk/svk_engine.h"
 
-void svkScene_Initialize(svkEngine* engine)
+void svkScene_Initialize(svkWindow* window, svkEngine* engine)
 {
     _svkEngineScene* scene = engine->scene;
     scene->drawables = svkVector_Create(0, sizeof(svkDrawable));
@@ -22,6 +22,10 @@ void svkScene_Initialize(svkEngine* engine)
     camera->pos[0] = 0.0f;
     camera->pos[1] = 2.0f;
     camera->pos[2] = 0.0f;
+    camera->inputLocked = true;
+    camera->mouseEnabled = false;
+
+    svkWindow_LockMouse(window->window, camera->mouseEnabled);
 }
 
 void svkScene_PostRender(svkEngine* engine)
@@ -66,7 +70,6 @@ void svkScene_RotateObject(
 
     memcpy(&ubo, drawable->buffers->mappedBuffers[frame], sizeof(ubo));
 
-    //glm_mat4_identity(ubo.model);
     glm_rotate(ubo.model, glm_rad(rotation[0]), (vec3){1.0f, 0.0f, 0.0f});
     glm_rotate(ubo.model, glm_rad(rotation[1]), (vec3){0.0f, 1.0f, 0.0f});
     glm_rotate(ubo.model, glm_rad(rotation[2]), (vec3){0.0f, 0.0f, 1.0f});
@@ -90,6 +93,7 @@ void svkScene_MoveObject(
 void svkScene_AddDrawable(svkEngine* engine, svkDrawable* drawable)
 {
     drawable->buffers = SVK_ALLOCSTRUCT(_svkEngineDrawableBuffers, 1);
+    SVK_ZM(drawable->buffers->indexBuffer, sizeof(VkBuffer));
 
     _svkEngine_CreateUniformBuffers(engine->core.physicalDevice, &engine->core.device, &drawable->buffers->uniformBuffers, &drawable->buffers->uniformBuffersMemory, &drawable->buffers->mappedBuffers);
     _svkEngine_CreateDescriptorSets(engine->core.device, engine->core.descriptorSetLayout, engine->core.descriptorPool, drawable->buffers->uniformBuffers, &drawable->descriptorSets);
@@ -212,10 +216,9 @@ void svkScene_Render(svkEngine* engine, VkCommandBuffer commandBuffer)
     {
         svkDrawable* drawable = (svkDrawable*)scene->drawables->data[i];
         VkBuffer buffer[1] = { drawable->buffers->vertexBuffer };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffer, offsets);
+        vkCmdBindVertexBuffers(commandBuffer, i, 1, buffer, offsets);
 
-        if (drawable->descriptorSets)
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, core->pipelineLayout, 0, 1, &drawable->descriptorSets[core->currentFrame], 0, NULL);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, core->pipelineLayout, 0, 1, &drawable->descriptorSets[core->currentFrame], 0, NULL);
 
         if (drawable->indices->size > 0)
         {
