@@ -32,20 +32,6 @@ void svkScene_PostRender(svkEngine* engine)
 {
     svkCamera* camera = engine->scene->camera;
 
-    vec3 front;
-    front[0] = cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-    front[1] = sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch));
-    front[2] = sin(glm_rad(camera->pitch));
-    glm_normalize_to(front, front);
-
-    vec3 target;
-    glm_vec3_add(camera->pos, front, target);
-
-    glm_lookat(camera->pos, target, VEC3_UP, camera->view);
-
-    glm_perspective(glm_rad(90.0f), camera->aspectRatio, camera->nearClip, camera->farClip, camera->projection);
-    camera->projection[1][1] *= -1.0f;
-
     for (size_t i = 0; i < engine->scene->drawables->size; i++)
     {
         svkDrawable* drawable = (svkDrawable*)engine->scene->drawables->data[i];
